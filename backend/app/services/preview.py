@@ -11,6 +11,21 @@ SMPL_PARENTS = [
     9, 9, 9, 12, 13, 14, 16, 17, 18, 19, 20, 21,
 ]
 
+# PHALP 的 2d_joints 經過 hmr2/phalp 的 smpl wrapper remap 成 OpenPose body25
+# 順序（不是 SMPL canonical），所以骨架連線要用 OpenPose body25 的 bone pairs。
+OPENPOSE_BODY25_PAIRS = [
+    (1, 0),    # Neck-Nose
+    (1, 2), (2, 3), (3, 4),     # right arm
+    (1, 5), (5, 6), (6, 7),     # left arm
+    (1, 8),                     # neck-midhip
+    (8, 9), (9, 10), (10, 11),  # right leg
+    (8, 12), (12, 13), (13, 14),  # left leg
+    (0, 15), (15, 17),          # right face
+    (0, 16), (16, 18),          # left face
+    (14, 19), (19, 20), (14, 21),  # left foot
+    (11, 22), (22, 23), (11, 24),  # right foot
+]
+
 
 def render_skeleton_gif(
     pkl_path: str | Path,
@@ -133,17 +148,15 @@ def render_overlay_video(
         tids = list(f.get("tid", []))
         if target_tid in tids:
             idx = tids.index(target_tid)
-            j2d = np.asarray(f["2d_joints"][idx]).reshape(-1, 2)[:24]
+            j2d = np.asarray(f["2d_joints"][idx]).reshape(-1, 2)[:25]
             px = j2d[:, 0] * new_size - pad_x
             py = j2d[:, 1] * new_size - pad_y
 
-            for k, parent in enumerate(SMPL_PARENTS):
-                if parent < 0:
-                    continue
-                p1 = (int(px[k]), int(py[k]))
-                p2 = (int(px[parent]), int(py[parent]))
+            for a, b in OPENPOSE_BODY25_PAIRS:
+                p1 = (int(px[a]), int(py[a]))
+                p2 = (int(px[b]), int(py[b]))
                 cv2.line(img, p1, p2, (0, 200, 255), 3, lineType=cv2.LINE_AA)
-            for k in range(24):
+            for k in range(25):
                 cv2.circle(img, (int(px[k]), int(py[k])), 4, (0, 255, 0), -1, lineType=cv2.LINE_AA)
 
         writer.write(img)
