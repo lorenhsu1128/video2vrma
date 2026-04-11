@@ -88,7 +88,7 @@ video2vrma/
 │   │   ├── vendor_paths.py    HOME / FVCORE_CACHE override + stub / patch
 │   │   ├── phalp_service.py   PHALP tracker 包裝
 │   │   ├── smpl_to_bvh_service.py  PHALP pkl → BVH
-│   │   ├── preview.py         SMPL 骨架 3D 動畫 GIF
+│   │   ├── preview.py         SMPL 骨架 3D 動畫 GIF + 2D overlay mp4
 │   │   └── pipeline.py        run_e2e 整合
 │   └── scripts/test_e2e.py    端到端 CLI
 ├── frontend/                  Next.js（Phase 5 起）

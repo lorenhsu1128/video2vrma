@@ -40,6 +40,8 @@ def main():
     print(f"  BVH: {result['bvh']} ({result['bvh'].stat().st_size} bytes)")
     if "gif" in result:
         print(f"  GIF: {result['gif']} ({result['gif'].stat().st_size} bytes)")
+    if "overlay" in result:
+        print(f"  OVERLAY: {result['overlay']} ({result['overlay'].stat().st_size} bytes)")
 
 
 if __name__ == "__main__":

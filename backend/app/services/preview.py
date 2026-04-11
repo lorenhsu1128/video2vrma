@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import joblib
 import numpy as np
 
 from . import vendor_paths  # noqa: F401
@@ -86,3 +87,68 @@ def render_skeleton_gif(
     anim.save(str(output_gif), writer=PillowWriter(fps=fps))
     plt.close(fig)
     return output_gif
+
+
+def render_overlay_video(
+    pkl_path: str | Path,
+    output_mp4: str | Path,
+    fps: int = 30,
+) -> Path:
+    import cv2
+
+    data = joblib.load(pkl_path)
+    frame_keys = sorted(data.keys())
+    if not frame_keys:
+        raise RuntimeError("empty PHALP pkl")
+
+    # 挑最長 track
+    tid_counts: dict[int, int] = {}
+    for fk in frame_keys:
+        for tid in data[fk].get("tid", []):
+            tid_counts[int(tid)] = tid_counts.get(int(tid), 0) + 1
+    if not tid_counts:
+        raise RuntimeError("no tracks in PHALP pkl")
+    target_tid = max(tid_counts.items(), key=lambda kv: kv[1])[0]
+
+    first = data[frame_keys[0]]
+    img_h, img_w = first["size"][0]
+    new_size = max(img_h, img_w)
+    pad_x = (new_size - img_w) // 2
+    pad_y = (new_size - img_h) // 2
+
+    output_mp4 = Path(output_mp4).resolve()
+    output_mp4.parent.mkdir(parents=True, exist_ok=True)
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    writer = cv2.VideoWriter(str(output_mp4), fourcc, fps, (img_w, img_h))
+    if not writer.isOpened():
+        raise RuntimeError(f"cv2.VideoWriter could not open {output_mp4}")
+
+    for fk in frame_keys:
+        f = data[fk]
+        img_path = Path(f["frame_path"].replace("\\", "/"))
+        img = cv2.imread(str(img_path))
+        if img is None:
+            continue
+
+        tids = list(f.get("tid", []))
+        if target_tid in tids:
+            idx = tids.index(target_tid)
+            j2d = np.asarray(f["2d_joints"][idx]).reshape(-1, 2)[:24]
+            px = j2d[:, 0] * new_size - pad_x
+            py = j2d[:, 1] * new_size - pad_y
+
+            for k, parent in enumerate(SMPL_PARENTS):
+                if parent < 0:
+                    continue
+                p1 = (int(px[k]), int(py[k]))
+                p2 = (int(px[parent]), int(py[parent]))
+                cv2.line(img, p1, p2, (0, 200, 255), 3, lineType=cv2.LINE_AA)
+            for k in range(24):
+                cv2.circle(img, (int(px[k]), int(py[k])), 4, (0, 255, 0), -1, lineType=cv2.LINE_AA)
+
+        writer.write(img)
+
+    writer.release()
+    if not output_mp4.exists() or output_mp4.stat().st_size == 0:
+        raise RuntimeError(f"overlay video not written: {output_mp4}")
+    return output_mp4

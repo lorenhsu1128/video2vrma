@@ -618,6 +618,7 @@ video2vrma/
 - ✅ 產出 `tmp/phase1/phalp/results/demo_dance.pkl`（120 frames × 1 track）
 - ✅ 產出 `tmp/phase1/dance.bvh`（94KB，24 joints SMPL hierarchy，`Frames: 120`，pose axis-angle abs-mean=0.30）
 - ✅ 產出 `tmp/phase1/dance_skeleton.gif`（~1.6MB，matplotlib 3D，相機座標 Y 反向後正向直立）
+- ✅ 產出 `tmp/phase1/dance_overlay.mp4`（~7.6MB，原始影片上疊骨架 2D joints，用 PHALP `2d_joints` 經 `new_image_size=max(H,W)` 反 padding 還原到原圖 pixel 座標）
 - ⏳ 1.7 Blender 骨架命名驗證待使用者手動跑
 
 **模型 cache 本機化（6.4 GB）**

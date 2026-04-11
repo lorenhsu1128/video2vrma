@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from .phalp_service import run_phalp
-from .preview import render_skeleton_gif
+from .preview import render_overlay_video, render_skeleton_gif
 from .smpl_to_bvh_service import convert_pkl_to_bvh
 from .vendor_paths import ROOT
 
@@ -39,4 +39,12 @@ def run_e2e(
             fps=fps,
         )
         result["gif"] = gif_path
+
+        overlay_path = output_dir / f"{video_path.stem}_overlay.mp4"
+        render_overlay_video(
+            pkl_path=pkl_path,
+            output_mp4=overlay_path,
+            fps=fps,
+        )
+        result["overlay"] = overlay_path
     return result
