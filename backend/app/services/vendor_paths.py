@@ -5,9 +5,33 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 VENDOR = ROOT / "vendor"
+MODELS = ROOT / "models"
+PROJECT_HOME = MODELS / "_home"
+PROJECT_IOPATH = MODELS / "iopath_cache"
 
-if "HOME" not in os.environ:
-    os.environ["HOME"] = os.environ.get("USERPROFILE", str(Path.home()))
+# 把 PHALP / 4D-Humans / detectron2 的 cache 都指到專案 models/ 下，避免每次
+# 重新下載，也讓模型檔跟專案打包在一起。HOME 的 override 只影響此 python
+# 進程，不是系統全域。
+PROJECT_HOME.mkdir(parents=True, exist_ok=True)
+PROJECT_IOPATH.mkdir(parents=True, exist_ok=True)
+os.environ["HOME"] = str(PROJECT_HOME)
+os.environ["FVCORE_CACHE"] = str(PROJECT_IOPATH)
+
+
+def _ensure_hmr2_download_marker() -> None:
+    # hmr2.models.download_models 只檢查 tarball 檔案存在與否決定要不要下載，
+    # 下載後立刻解壓。migration 把已解壓的 2.7GB tarball 刪掉節省空間，因此
+    # 這裡在解壓完成的前提下補一個 0 byte 佔位檔，避免每次重新下載。
+    flag = PROJECT_HOME / ".cache" / "4DHumans" / "logs" / "train" / "multiruns" / "hmr2" / "0" / "model_config.yaml"
+    if not flag.exists():
+        return
+    marker = PROJECT_HOME / ".cache" / "4DHumans" / "hmr2_data.tar.gz"
+    if not marker.exists():
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.touch()
+
+
+_ensure_hmr2_download_marker()
 
 _PATHS = [
     VENDOR / "PHALP",

@@ -37,8 +37,9 @@ def main():
     dt = time.time() - t0
     print(f"\n[OK] Phase 1 e2e completed in {dt:.1f}s")
     print(f"  PKL: {result['pkl']}")
-    print(f"  BVH: {result['bvh']}")
-    print(f"  BVH size: {result['bvh'].stat().st_size} bytes")
+    print(f"  BVH: {result['bvh']} ({result['bvh'].stat().st_size} bytes)")
+    if "gif" in result:
+        print(f"  GIF: {result['gif']} ({result['gif'].stat().st_size} bytes)")
 
 
 if __name__ == "__main__":

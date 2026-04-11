@@ -79,7 +79,18 @@ video2vrma/
 │   └── bvh2vrma/
 ├── data/
 │   └── smpl/                  SMPL 模型（不進 git）
-├── backend/                   FastAPI（Phase 3 起）
+├── models/                    本機模型 cache（不進 git，~6.4 GB）
+│   ├── _home/.cache/phalp/    PHALP 權重 + SMPL_NEUTRAL（env HOME 指向這裡）
+│   ├── _home/.cache/4DHumans/ 4D-Humans hmr2 checkpoint + configs
+│   └── iopath_cache/detectron2/ ViTDet + mask_rcnn 權重（env FVCORE_CACHE）
+├── backend/                   FastAPI
+│   ├── app/services/          pipeline adapter 層
+│   │   ├── vendor_paths.py    HOME / FVCORE_CACHE override + stub / patch
+│   │   ├── phalp_service.py   PHALP tracker 包裝
+│   │   ├── smpl_to_bvh_service.py  PHALP pkl → BVH
+│   │   ├── preview.py         SMPL 骨架 3D 動畫 GIF
+│   │   └── pipeline.py        run_e2e 整合
+│   └── scripts/test_e2e.py    端到端 CLI
 ├── frontend/                  Next.js（Phase 5 起）
 └── tmp/                       暫存（不進 git）
 ```

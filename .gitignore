@@ -28,6 +28,9 @@ data/smpl/
 # vendor/ 第三方專案（各自獨立 git repo，用 vendor-versions.txt 固定 commit hash）
 vendor/
 
+# 本機模型 cache（PHALP / 4D-Humans / detectron2 的 checkpoint 與權重）
+models/
+
 # 模型權重 / checkpoint
 *.pt
 *.pth

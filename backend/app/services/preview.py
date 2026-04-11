@@ -1,0 +1,88 @@
+from pathlib import Path
+
+import numpy as np
+
+from . import vendor_paths  # noqa: F401
+from .smpl_to_bvh_service import _ensure_smpl_layout, extract_longest_track
+
+SMPL_PARENTS = [
+    -1, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8,
+    9, 9, 9, 12, 13, 14, 16, 17, 18, 19, 20, 21,
+]
+
+
+def render_skeleton_gif(
+    pkl_path: str | Path,
+    output_gif: str | Path,
+    smpl_root: str | Path,
+    fps: int = 30,
+    stride: int = 1,
+) -> Path:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation, PillowWriter
+    import smplx
+    import torch
+
+    pose_aa, _tid = extract_longest_track(pkl_path)
+    pose_aa = pose_aa[::stride]
+    n = pose_aa.shape[0]
+
+    smpl_root = Path(smpl_root).resolve()
+    _ensure_smpl_layout(smpl_root)
+
+    model = smplx.create(
+        model_path=str(smpl_root),
+        model_type="smpl",
+        gender="NEUTRAL",
+        batch_size=n,
+    )
+
+    global_orient = torch.from_numpy(pose_aa[:, 0:1, :].reshape(n, 3)).float()
+    body_pose = torch.from_numpy(pose_aa[:, 1:, :].reshape(n, 69)).float()
+    with torch.no_grad():
+        out = model(global_orient=global_orient, body_pose=body_pose)
+    joints = out.joints.detach().cpu().numpy()[:, :24, :]  # (n, 24, 3)
+    # PHALP / HMR2 輸出在相機座標（Y 朝下），反向讓畫面是正向直立
+    joints[:, :, 1] *= -1
+
+    lo = joints.reshape(-1, 3).min(axis=0)
+    hi = joints.reshape(-1, 3).max(axis=0)
+    mid = (lo + hi) / 2
+    half = max((hi - lo).max() / 2, 0.5)
+    xlim = (mid[0] - half, mid[0] + half)
+    ylim = (mid[2] - half, mid[2] + half)
+    zlim = (mid[1] - half, mid[1] + half)
+
+    fig = plt.figure(figsize=(5, 5), dpi=100)
+    ax = fig.add_subplot(111, projection="3d")
+
+    def animate(i: int):
+        ax.clear()
+        j = joints[i]
+        xs, ys, zs = j[:, 0], j[:, 2], j[:, 1]
+        ax.scatter(xs, ys, zs, c="red", s=18)
+        for k, p in enumerate(SMPL_PARENTS):
+            if p < 0:
+                continue
+            ax.plot(
+                [j[k, 0], j[p, 0]],
+                [j[k, 2], j[p, 2]],
+                [j[k, 1], j[p, 1]],
+                c="steelblue",
+                linewidth=2,
+            )
+        ax.set_xlim(*xlim)
+        ax.set_ylim(*ylim)
+        ax.set_zlim(*zlim)
+        ax.set_box_aspect((1, 1, 1))
+        ax.set_title(f"frame {i * stride} / {n * stride}")
+        ax.view_init(elev=15, azim=-70)
+
+    anim = FuncAnimation(fig, animate, frames=n, interval=1000 / fps)
+    output_gif = Path(output_gif).resolve()
+    output_gif.parent.mkdir(parents=True, exist_ok=True)
+    anim.save(str(output_gif), writer=PillowWriter(fps=fps))
+    plt.close(fig)
+    return output_gif

@@ -614,10 +614,21 @@ video2vrma/
 **驗收：**
 - ✅ `conda run -n aicuda python backend/scripts/test_e2e.py --video dance.mp4 --end-frame 120` 跑通
 - ✅ PHALP tracking 首次跑約 6 分 27 秒（192 frames），在 5070 Ti sm_120 上 CUDA 記憶體佔用 6.3GB（所有模型都在 cuda:0）
-- ✅ 第二次跑（reuse pkl）跑 BVH 只花 19.4s
+- ✅ 第二次跑（reuse pkl）BVH + GIF 只花 ~29s
 - ✅ 產出 `tmp/phase1/phalp/results/demo_dance.pkl`（120 frames × 1 track）
 - ✅ 產出 `tmp/phase1/dance.bvh`（94KB，24 joints SMPL hierarchy，`Frames: 120`，pose axis-angle abs-mean=0.30）
+- ✅ 產出 `tmp/phase1/dance_skeleton.gif`（~1.6MB，matplotlib 3D，相機座標 Y 反向後正向直立）
 - ⏳ 1.7 Blender 骨架命名驗證待使用者手動跑
+
+**模型 cache 本機化（6.4 GB）**
+
+為了避免每次重新下載，所有 vendor 用到的模型權重都透過 env 重導向到專案下的 `models/` 目錄：
+
+- `os.environ["HOME"] = <project>/models/_home` → PHALP 與 4D-Humans 的 `CACHE_DIR` 都落在 `models/_home/.cache/`
+- `os.environ["FVCORE_CACHE"] = <project>/models/iopath_cache` → detectron2 的 ViTDet / mask_rcnn checkpoint 落在 `models/iopath_cache/detectron2/`
+- 首次遷移：`conda run -n aicuda python scripts/migrate_model_cache.py` 把 `$USERPROFILE/.cache/phalp|4DHumans` 與 `$USERPROFILE/.torch/iopath_cache` 搬到 `models/` 下，刪掉 2.7GB 的冗餘 hmr2_data.tar.gz
+- 為了不讓 `hmr2.models.download_models` 誤以為 tarball 不存在而重新下載，`vendor_paths.py` 會在解壓標記檔存在時補一個 0 byte 的 `hmr2_data.tar.gz` placeholder
+- `models/` 已加進 `.gitignore`
 
 ---
 
