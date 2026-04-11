@@ -558,25 +558,21 @@ video2vrma/
 
 - [x] 0.1 建立 video2vrma/ 專案根目錄結構（根目錄 + data/ + vendor/ 已存在；backend/frontend/tmp 待建）
 - [x] 0.2 Clone 所有第三方專案（4d-humans, PHALP, smpl2bvh, bvh2vrma 已存在 vendor/）
-  - [ ] 0.2.1 產生 vendor-versions.txt 固定 commit hash
-    ```bash
-    for d in vendor/*/; do echo "$(basename $d): $(cd $d && git rev-parse --short HEAD)"; done > vendor-versions.txt
-    ```
+  - [x] 0.2.1 產生 vendor-versions.txt 固定 commit hash
 - [x] 0.3 建立 conda 環境 + PyTorch CUDA（aicuda：Python 3.12.11 + torch 2.7.1+cu128，CUDA 測試通過）
-- [ ] 0.4 安裝 vendor Python 依賴（已完成大部分）
+- [x] 0.4 安裝 vendor Python 依賴（安全子集完成，pytorch3d / detectron2 延後）
   - [x] hmr2, phalp, pytorch-lightning 1.9.5, hydra, omegaconf, transformers, opencv, mediapipe, pyrender, trimesh, scipy, chumpy, yacs ✅
-  - [ ] **smplx**（缺，必裝）：`pip install smplx`
-  - [ ] **pytorch3d**（缺，必裝或確認非必需）：Windows 安裝麻煩，先確認 PHALP minimal path 是否需要
-  - [ ] **detectron2**（缺，PHALP 可能必需）：Windows 需從原始碼編譯；若失敗改走 4D-Humans ViTDet 路線
+  - [x] **smplx** 0.1.28 已裝
+  - [ ] **pytorch3d**：延後至 Phase 1，視 PHALP 最小路徑是否實際需要再處理（sm_120 預編 wheel 風險，見 lesson 0004）
+  - [ ] **detectron2**：延後至 Phase 1，優先嘗試 4D-Humans 原生 ViTDet 路線，避開 Windows 編譯
 - [x] 0.5 下載 SMPL 模型 → data/smpl/（SMPL_NEUTRAL.npz + m/f/neutral pkl 全部就位）
-- [ ] 0.6 安裝後端依賴：`pip install fastapi uvicorn python-multipart websockets scipy`
-  - [x] fastapi, uvicorn, websockets, scipy 已裝
-  - [ ] 確認 python-multipart 是否已裝
-- [ ] 0.7 初始化前端 Next.js + 安裝 three-vrm 相關套件
-  - 版本對齊 vendor/bvh2vrma/package.json：`next@13.4.4`、`three@^0.153.0`、`@pixiv/three-vrm@^2.1.0`、`@pixiv/three-vrm-animation@^2.1.0`、`@gltf-transform/core@^3.4.0`、`react@18.2.0`
-  - 注意：bvh2vrma 使用 **pages router**（非 app router），若要直接 import 其核心模組（`src/lib/bvh-converter`、`src/lib/VRMAnimation`），前端建議使用相同 Next.js 版本以避免 API 不相容
-- [ ] 0.8 撰寫 CLAUDE.md
-- [ ] 0.9 建立 .gitignore（需忽略 data/smpl/、tmp/、node_modules/、.next/、vendor/ 內的 *.pt / *.ckpt / checkpoints/）
+- [x] 0.6 安裝後端依賴：fastapi / uvicorn / python-multipart / websockets / scipy 全部就位
+- [x] 0.7 初始化前端 Next.js + three-vrm 套件
+  - 版本對齊 vendor/bvh2vrma：`next@13.4.4`、`three@^0.153.0`、`@pixiv/three-vrm@^2.1.0`、`@pixiv/three-vrm-animation@^2.1.0`、`@gltf-transform/core@^3.4.0`、`react@18.2.0`
+  - npm 嚴格 peer-deps 檢查會與 bvh2vrma 原 yarn 解析差異衝突，因此在 `frontend/.npmrc` 開 `legacy-peer-deps=true`，對齊 yarn 行為
+  - 使用 app router（`src/app/`），若 Phase 2 要直接 import vendor/bvh2vrma 的 lib 再評估是否要切回 pages router
+- [x] 0.8 撰寫 CLAUDE.md
+- [x] 0.9 建立 .gitignore（已加入 vendor/、data/smpl/、tmp/、node_modules/、.next/、模型權重 等）
 
 **驗收：** import hmr2 / phalp 不報錯 ✅、smplx 可載入、前後端可啟動、vendor/bvh2vrma 能 yarn install && yarn dev 獨立跑起來
 
