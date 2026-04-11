@@ -22,8 +22,7 @@ venv/
 env/
 
 # SMPL 授權模型（不得進 git）
-data/smpl/*.pkl
-data/smpl/*.npz
+data/smpl/
 !data/smpl/.gitkeep
 
 # vendor/ 第三方專案（各自獨立 git repo，用 vendor-versions.txt 固定 commit hash）

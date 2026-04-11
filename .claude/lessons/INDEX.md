@@ -9,6 +9,7 @@
 - [0002](0002-vendor-readonly.md) — `vendor/` 是只讀目錄，客製化寫在 services 層（vendor, architecture）
 - [0003](0003-windows-bash-conventions.md) — Windows git bash 用 `/dev/null` 與正斜線路徑（windows, shell）
 - [0004](0004-sm120-wheel-compatibility.md) — RTX 5070 Ti sm_120 對預編 wheel 相容性有限（cuda, environment）
+- [0005](0005-vendor-import-side-effect-patches.md) — vendor/ 只讀時用 sys.modules stub + monkey-patch 繞過 import side-effect（vendor, architecture, windows）
 
 ## 規則摘要（取自所有 lessons）
 

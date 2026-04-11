@@ -584,15 +584,40 @@ video2vrma/
 
 **任務：**
 
-- [ ] 1.1 準備 5-10 秒測試影片
-- [ ] 1.2 研讀 PHALP 原始碼，找最小初始化路徑
-- [ ] 1.3 撰寫 backend/scripts/test_e2e.py
-- [ ] 1.4 驗證 PHALP 輸出 pkl 結構
-- [ ] 1.5 研讀 smpl2bvh 原始碼，確認輸入輸出格式
-- [ ] 1.6 處理 PHALP → smpl2bvh 格式銜接
-- [ ] 1.7 用 Blender 驗證 BVH，**記錄實際骨架命名**（Phase 2 會用到）
+- [x] 1.1 準備測試影片（`dance.mp4`，使用者提供，192 frames）
+- [x] 1.2 研讀 PHALP 原始碼，找最小初始化路徑
+  - 使用 `OmegaConf.structured(Human4DConfig())` 建 cfg，`video.source` 傳 posix 絕對路徑
+  - `HMR2_4dhuman(cfg).track()` 即可；cfg.render.enable=False、overwrite=False
+- [x] 1.3 撰寫 `backend/scripts/test_e2e.py` 與 `backend/app/services/{phalp_service,smpl_to_bvh_service,pipeline,vendor_paths}.py`
+- [x] 1.4 驗證 PHALP 輸出 pkl 結構
+  - 頂層 dict 以 frame_name 為 key，每幀含 `tid / smpl / camera / 2d_joints / 3d_joints / bbox / ...`
+  - `smpl[i]` = `{'global_orient':(1,3,3), 'body_pose':(23,3,3), 'betas':(10,)}` rotation matrix
+- [x] 1.5 研讀 smpl2bvh 原始碼，確認輸入輸出格式
+  - `smpl2bvh(model_path, poses, output, ...)` 需要 `.pkl` 含 `smpl_poses (N,72) axis-angle, smpl_trans (N,3), smpl_scaling (1,)`
+  - smplx.create 要 `<model_path>/smpl/SMPL_NEUTRAL.{pkl,npz}` 巢狀 layout
+- [x] 1.6 PHALP → smpl2bvh 銜接：`extract_longest_track()` 挑最長 track，用 scipy `Rotation.from_matrix().as_rotvec()` 轉 axis-angle
+- [ ] 1.7 用 Blender 驗證 BVH 骨架命名（手動步驟，待 Phase 2 前完成）
 
-**驗收：** test_e2e.py 跑通，BVH 在 Blender 中動畫合理
+**Phase 1 環境補丁（關鍵記錄）**
+
+為了讓 vendor/ 的 PHALP / 4D-Humans 在 Windows + Py3.12 + torch 2.7 環境下跑起來，`backend/app/services/vendor_paths.py` 做了以下 side-effect 式 patch（不動 vendor/）：
+
+1. `HOME` env var 補成 `USERPROFILE`（PHALP 的 `CACHE_DIR` 依賴）
+2. `pyrender` / `phalp.visualize.py_renderer` / `neural_renderer` 三個 module 用 permissive stub 攔截（Windows 沒 libEGL、neural_renderer 沒 wheel；Phase 1 不需要 render）
+3. `torch.load` 預設 `weights_only=False`（PyTorch 2.6+ 預設擋掉含 omegaconf 的 Lightning checkpoint）
+4. `phalp_service._patch_hmr2_skip_renderer()` 把 `hmr2.models.hmr2.HMR2.__init__` 預設 `init_renderer=False`，避免 Lightning reconstruct 時實例化需要 pyrender 的 renderer
+5. `_prepopulate_smpl_caches()`：把 `data/smpl/basicmodel_neutral_lbs_10_207_0_v1.1.0.pkl` 轉 py3 pickle 後放到 PHALP 與 4D-Humans 各自的 cache 路徑，跳過 vendor 內硬寫 `wget` 下載指令（Windows 沒 wget）
+6. `scripts/download_hmr2_data.py` 處理 4D-Humans 的 2.7GB checkpoint tarball（URL 的 `.tar.gz` 其實是未壓縮 tar，自動偵測 magic 用 `r:` 模式解壓）
+
+**Phase 1 缺的 vendor 依賴（已補裝到 aicuda）**：`dill` / `webdataset` / `scenedetect` / `braceexpand` / `timm` / `einops` / `scikit-image` / `pandas` / `gdown` / `cmake`
+
+**驗收：**
+- ✅ `conda run -n aicuda python backend/scripts/test_e2e.py --video dance.mp4 --end-frame 120` 跑通
+- ✅ PHALP tracking 首次跑約 6 分 27 秒（192 frames），在 5070 Ti sm_120 上 CUDA 記憶體佔用 6.3GB（所有模型都在 cuda:0）
+- ✅ 第二次跑（reuse pkl）跑 BVH 只花 19.4s
+- ✅ 產出 `tmp/phase1/phalp/results/demo_dance.pkl`（120 frames × 1 track）
+- ✅ 產出 `tmp/phase1/dance.bvh`（94KB，24 joints SMPL hierarchy，`Frames: 120`，pose axis-angle abs-mean=0.30）
+- ⏳ 1.7 Blender 骨架命名驗證待使用者手動跑
 
 ---
 
