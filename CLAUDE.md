@@ -86,7 +86,15 @@ video2vrma/
 │   └── iopath_cache/detectron2/ ViTDet + mask_rcnn 權重（env FVCORE_CACHE）
 ├── backend/                   FastAPI
 │   ├── app/
+│   │   ├── main.py            create_app + lifespan + lazy `app` 屬性
 │   │   ├── config.py          路徑常數 + 預設參數（FPS / end_frame / smoothing）
+│   │   ├── core/
+│   │   │   ├── task_manager.py  TaskState + TaskStep + queue + WS subscribers
+│   │   │   └── gpu_worker.py    背景 worker：detect 走 queue，convert 由路由直呼
+│   │   ├── models/schemas.py  Pydantic request/response
+│   │   ├── routers/
+│   │   │   ├── upload.py       POST /api/upload
+│   │   │   └── tasks.py        GET status/tracks/download + POST convert + WS
 │   │   └── services/          pipeline adapter 層
 │   │       ├── vendor_paths.py        HOME / FVCORE_CACHE override + stub / patch
 │   │       ├── phalp_service.py       PHALP tracker 包裝
@@ -94,9 +102,10 @@ video2vrma/
 │   │       ├── smoothing.py           Savitzky-Golay 平滑（rotmat 空間 + SVD 投影）
 │   │       ├── smpl_to_bvh_service.py pose_aa → BVH via smpl2bvh
 │   │       ├── preview.py             骨架 3D GIF + 2D overlay mp4
-│   │       └── pipeline.py            run_e2e 整合
+│   │       └── pipeline.py            run_e2e + step1_detect/step2_convert
 │   ├── scripts/test_e2e.py    端到端 CLI
-│   └── tests/                 pytest 單元測試
+│   ├── pytest.ini             asyncio_mode=auto
+│   └── tests/                 pytest 單元測試（含 FastAPI TestClient + stub pipeline）
 ├── frontend/                  Next.js 13.4 (app router)
 │   ├── src/app/page.tsx       Phase 2 驗證頁：上傳 BVH → 轉 VRMA → 3D 預覽
 │   ├── src/components/VrmPreview.tsx  three + @pixiv/three-vrm 預覽器

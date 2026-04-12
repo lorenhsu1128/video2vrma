@@ -6,7 +6,41 @@ from .phalp_service import run_phalp
 from .preview import render_overlay_video, render_skeleton_gif
 from .smoothing import smooth_pose_aa
 from .smpl_to_bvh_service import convert_pkl_to_bvh
-from .track_extractor import extract_longest_track
+from .track_extractor import extract_longest_track, extract_track, list_tracks_meta
+
+
+def step1_detect(
+    video_path: str | Path,
+    output_dir: str | Path,
+    end_frame: int = DEFAULT_END_FRAME,
+) -> dict:
+    """跑 PHALP，回傳 {pkl, tracks}：tracks 是按 frame_count 排序的 meta 列表。"""
+    video_path = Path(video_path).resolve()
+    output_dir = Path(output_dir).resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    pkl_path = run_phalp(video_path, output_dir / "phalp", end_frame=end_frame)
+    return {"pkl": pkl_path, "tracks": list_tracks_meta(pkl_path)}
+
+
+def step2_convert(
+    pkl_path: str | Path,
+    output_bvh: str | Path,
+    track_id: int,
+    fps: int = DEFAULT_FPS,
+    smoothing: bool = False,
+) -> Path:
+    pose_aa = extract_track(pkl_path, track_id)
+    if smoothing:
+        pose_aa = smooth_pose_aa(pose_aa)
+    output_bvh = Path(output_bvh).resolve()
+    convert_pkl_to_bvh(
+        pkl_path=pkl_path,
+        output_bvh=output_bvh,
+        smpl_root=SMPL_ROOT,
+        fps=fps,
+        pose_aa=pose_aa,
+    )
+    return output_bvh
 
 
 def run_e2e(

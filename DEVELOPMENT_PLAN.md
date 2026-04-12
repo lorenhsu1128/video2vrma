@@ -688,13 +688,13 @@ video2vrma/
 
 **目標：** FastAPI + 記憶體內任務佇列，一個指令啟動。
 
-- [ ] 4.1 task_manager.py
-- [ ] 4.2 gpu_worker.py
-- [ ] 4.3 main.py (lifespan + uvicorn)
-- [ ] 4.4 schemas.py
-- [ ] 4.5 upload.py router
-- [ ] 4.6 tasks.py router (含 WebSocket)
-- [ ] 4.7 API 測試
+- [x] 4.1 task_manager.py
+- [x] 4.2 gpu_worker.py
+- [x] 4.3 main.py (lifespan + uvicorn)
+- [x] 4.4 schemas.py
+- [x] 4.5 upload.py router
+- [x] 4.6 tasks.py router (含 WebSocket)
+- [x] 4.7 API 測試
 
 **驗收：** `python -m app.main` 啟動，curl 走完流程
 

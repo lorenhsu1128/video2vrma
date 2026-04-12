@@ -49,3 +49,19 @@ def extract_longest_track(pkl_path: str | Path) -> tuple[np.ndarray, int]:
         raise RuntimeError("No SMPL tracks found in PHALP output")
     tid, seq = max(tracks.items(), key=lambda kv: len(kv[1]))
     return smpl_track_to_axis_angle(seq), tid
+
+
+def extract_track(pkl_path: str | Path, track_id: int) -> np.ndarray:
+    data = load_phalp_pkl(pkl_path)
+    tracks = collect_tracks(data)
+    if track_id not in tracks:
+        raise KeyError(f"track_id={track_id} not in PHALP pkl (have {sorted(tracks.keys())})")
+    return smpl_track_to_axis_angle(tracks[track_id])
+
+
+def list_tracks_meta(pkl_path: str | Path) -> list[dict]:
+    """每個 track 的 (track_id, frame_count)，依長度由大到小排序。"""
+    data = load_phalp_pkl(pkl_path)
+    tracks = collect_tracks(data)
+    items = sorted(tracks.items(), key=lambda kv: -len(kv[1]))
+    return [{"track_id": int(tid), "frame_count": len(seq)} for tid, seq in items]
