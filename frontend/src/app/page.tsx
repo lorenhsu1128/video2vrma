@@ -7,7 +7,6 @@ import { ProgressDisplay } from "@/components/ProgressDisplay";
 import { ReviewPanel } from "@/components/ReviewPanel";
 import { SystemStats } from "@/components/SystemStats";
 import { TrackSelector } from "@/components/TrackSelector";
-import { VideoTrimmer } from "@/components/VideoTrimmer";
 import { VideoUploader } from "@/components/VideoUploader";
 import { useTaskProgress } from "@/hooks/useTaskProgress";
 import {
@@ -73,10 +72,6 @@ export default function Home() {
     },
     [],
   );
-
-  const onCancelTrim = useCallback(() => {
-    setSelectedFile(null);
-  }, []);
 
   useEffect(() => {
     if (!taskId || progress.step !== "tracks_ready" || tracks !== null) return;
@@ -173,6 +168,10 @@ export default function Home() {
     !busy &&
     (progress.step === "tracks_ready" || progress.step === "bvh_ready");
 
+  const trimConfig = selectedFile
+    ? { file: selectedFile, disabled: busy, onStart: onStartConvert }
+    : null;
+
   return (
     <main style={{ padding: "2rem", fontFamily: "sans-serif", maxWidth: "100%", margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
@@ -184,28 +183,18 @@ export default function Home() {
       </p>
 
       <section style={{ marginBottom: 16 }}>
-        {!selectedFile && !taskId && (
-          <VideoUploader disabled={busy} onFileSelected={onFileSelected} />
-        )}
-
-        {selectedFile && !taskId && (
-          <VideoTrimmer
-            file={selectedFile}
-            disabled={busy}
-            onStart={onStartConvert}
-            onCancel={onCancelTrim}
-          />
-        )}
-
-        {taskId && (
-          <div style={{ marginTop: 6, fontSize: "0.85em", color: "#666" }}>
-            task: <code>{taskId}</code>
-            {fileName && <> · {fileName}</>}
-            <button onClick={onReset} style={{ marginLeft: 12, fontSize: "0.85em" }}>
-              重新開始
-            </button>
-          </div>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <VideoUploader disabled={busy || !!taskId} onFileSelected={onFileSelected} />
+          {(selectedFile || taskId) && (
+            <span style={{ fontSize: "0.85em", color: "#666" }}>
+              {taskId && <>task: <code>{taskId}</code> · </>}
+              {fileName || selectedFile?.name}
+              <button onClick={onReset} style={{ marginLeft: 12, fontSize: "0.85em" }}>
+                重新開始
+              </button>
+            </span>
+          )}
+        </div>
       </section>
 
       {taskId && (
@@ -262,6 +251,7 @@ export default function Home() {
           overlayUrl={srcOverlayUrl}
           vrmaBlob={vrmaBlob}
           vrmUrl="/models/default.vrm"
+          trim={trimConfig}
         />
       </section>
 

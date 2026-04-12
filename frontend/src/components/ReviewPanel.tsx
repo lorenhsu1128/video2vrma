@@ -1,85 +1,225 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { VrmPreview, VrmPreviewHandle } from "./VrmPreview";
+
+function fmtTime(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = sec - m * 60;
+  return `${m}:${s.toFixed(1).padStart(4, "0")}`;
+}
+
+type TrimConfig = {
+  file: File;
+  disabled?: boolean;
+  onStart: (file: File, startTime: number, endTime: number) => void;
+};
 
 type Props = {
   videoUrl: string | null;
   overlayUrl: string | null;
   vrmaBlob: Blob | null;
   vrmUrl: string;
+  trim?: TrimConfig | null;
 };
 
-export function ReviewPanel({ videoUrl, overlayUrl, vrmaBlob, vrmUrl }: Props) {
+export function ReviewPanel({ videoUrl, overlayUrl, vrmaBlob, vrmUrl, trim }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLVideoElement>(null);
   const vrmRef = useRef<VrmPreviewHandle>(null);
   const [playing, setPlaying] = useState(false);
 
-  const syncPlay = useCallback(() => {
-    videoRef.current?.play();
-    overlayRef.current?.play();
-    vrmRef.current?.play();
-    setPlaying(true);
+  const [duration, setDuration] = useState(0);
+  const [startTime, setStartTime] = useState(0);
+  const [endTime, setEndTime] = useState(0);
+  const rafRef = useRef<number>(0);
+
+  const localUrl = useMemo(
+    () => (trim?.file ? URL.createObjectURL(trim.file) : null),
+    [trim?.file],
+  );
+  useEffect(() => {
+    return () => {
+      if (localUrl) URL.revokeObjectURL(localUrl);
+    };
+  }, [localUrl]);
+
+  const activeVideoSrc = localUrl ?? videoUrl;
+  const isTrimming = !!trim;
+
+  const onVideoLoaded = useCallback(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const dur = v.duration || 0;
+    setDuration(dur);
+    setStartTime(0);
+    setEndTime(dur);
   }, []);
+
+  useEffect(() => {
+    if (!isTrimming) return;
+    const v = videoRef.current;
+    if (!v || !playing) return;
+    const check = () => {
+      if (v.currentTime >= endTime) {
+        v.pause();
+        v.currentTime = startTime;
+        setPlaying(false);
+        return;
+      }
+      rafRef.current = requestAnimationFrame(check);
+    };
+    rafRef.current = requestAnimationFrame(check);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [isTrimming, playing, startTime, endTime]);
+
+  const syncPlay = useCallback(() => {
+    if (isTrimming) {
+      const v = videoRef.current;
+      if (!v) return;
+      v.currentTime = startTime;
+      v.play();
+    } else {
+      videoRef.current?.play();
+      overlayRef.current?.play();
+      vrmRef.current?.play();
+    }
+    setPlaying(true);
+  }, [isTrimming, startTime]);
 
   const syncPause = useCallback(() => {
     videoRef.current?.pause();
-    overlayRef.current?.pause();
-    vrmRef.current?.pause();
+    if (!isTrimming) {
+      overlayRef.current?.pause();
+      vrmRef.current?.pause();
+    }
     setPlaying(false);
-  }, []);
+  }, [isTrimming]);
 
   const syncReset = useCallback(() => {
     if (videoRef.current) {
       videoRef.current.pause();
-      videoRef.current.currentTime = 0;
+      videoRef.current.currentTime = isTrimming ? startTime : 0;
     }
-    if (overlayRef.current) {
-      overlayRef.current.pause();
-      overlayRef.current.currentTime = 0;
+    if (!isTrimming) {
+      if (overlayRef.current) {
+        overlayRef.current.pause();
+        overlayRef.current.currentTime = 0;
+      }
+      vrmRef.current?.reset();
     }
-    vrmRef.current?.reset();
     setPlaying(false);
-  }, []);
+  }, [isTrimming, startTime]);
 
   const onVideoEnded = useCallback(() => {
     syncPause();
   }, [syncPause]);
 
-  const hasContent = videoUrl || overlayUrl || vrmaBlob;
+  const onStartChange = useCallback(
+    (val: number) => {
+      const clamped = Math.min(val, endTime - 0.1);
+      const v = Math.max(0, clamped);
+      setStartTime(v);
+      const el = videoRef.current;
+      if (el && !playing) el.currentTime = v;
+    },
+    [endTime, playing],
+  );
+
+  const onEndChange = useCallback(
+    (val: number) => {
+      const clamped = Math.max(val, startTime + 0.1);
+      setEndTime(Math.min(duration, clamped));
+    },
+    [startTime, duration],
+  );
+
+  const segmentDuration = Math.max(0, endTime - startTime);
+  const hasContent = activeVideoSrc || overlayUrl || vrmaBlob;
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, flexWrap: "wrap" }}>
         <button
           onClick={playing ? syncPause : syncPlay}
           disabled={!hasContent}
           style={ctrlBtnStyle}
         >
-          {playing ? "⏸ 暫停" : "▶ 同步播放"}
+          {playing ? "⏸ 暫停" : isTrimming ? "▶ 預覽片段" : "▶ 同步播放"}
         </button>
         <button onClick={syncReset} disabled={!hasContent} style={ctrlBtnStyle}>
           ⏹ 重置
         </button>
+        {isTrimming && trim && (
+          <button
+            onClick={() => trim.onStart(trim.file, startTime, endTime)}
+            disabled={trim.disabled || segmentDuration < 0.1}
+            style={{
+              ...startBtnStyle,
+              opacity: trim.disabled || segmentDuration < 0.1 ? 0.5 : 1,
+            }}
+          >
+            開始轉換
+          </button>
+        )}
       </div>
 
       <div style={{ display: "flex", gap: 4 }}>
         <div style={panelStyle}>
-          <div style={labelStyle}>原始影片</div>
-          {videoUrl ? (
-            <video
-              ref={videoRef}
-              src={videoUrl}
-              onEnded={onVideoEnded}
-              preload="auto"
-              playsInline
-              muted
-              style={mediaStyle}
-            />
+          <div style={labelStyle}>
+            原始影片
+            {isTrimming && duration > 0 && (
+              <span style={{ fontWeight: "normal", marginLeft: 8 }}>
+                {fmtTime(segmentDuration)} / {fmtTime(duration)}
+              </span>
+            )}
+          </div>
+          {activeVideoSrc ? (
+            <>
+              <video
+                ref={videoRef}
+                src={activeVideoSrc}
+                onLoadedMetadata={isTrimming ? onVideoLoaded : undefined}
+                onEnded={onVideoEnded}
+                preload="auto"
+                playsInline
+                muted
+                style={mediaStyle}
+              />
+              {isTrimming && duration > 0 && (
+                <div style={{ padding: "8px 8px 6px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                    <span style={sliderLabel}>起始</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={duration}
+                      step={0.1}
+                      value={startTime}
+                      onChange={(e) => onStartChange(Number(e.target.value))}
+                      style={{ flex: 1 }}
+                    />
+                    <span style={timeDisplay}>{fmtTime(startTime)}</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={sliderLabel}>結束</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={duration}
+                      step={0.1}
+                      value={endTime}
+                      onChange={(e) => onEndChange(Number(e.target.value))}
+                      style={{ flex: 1 }}
+                    />
+                    <span style={timeDisplay}>{fmtTime(endTime)}</span>
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
-            <div style={placeholderStyle}>等待上傳…</div>
+            <div style={placeholderStyle}>等待選擇影片…</div>
           )}
         </div>
 
@@ -153,4 +293,29 @@ const ctrlBtnStyle: React.CSSProperties = {
   borderRadius: 4,
   cursor: "pointer",
   fontSize: "0.9em",
+};
+
+const startBtnStyle: React.CSSProperties = {
+  padding: "6px 18px",
+  background: "#2563eb",
+  color: "#fff",
+  border: "none",
+  borderRadius: 4,
+  cursor: "pointer",
+  fontSize: "0.9em",
+  fontWeight: "bold",
+};
+
+const sliderLabel: React.CSSProperties = {
+  fontSize: "0.8em",
+  color: "#666",
+  minWidth: 30,
+};
+
+const timeDisplay: React.CSSProperties = {
+  minWidth: 45,
+  textAlign: "right",
+  fontFamily: "monospace",
+  fontSize: "0.8em",
+  color: "#444",
 };
