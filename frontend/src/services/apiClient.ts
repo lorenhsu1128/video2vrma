@@ -87,6 +87,14 @@ export async function downloadBvhText(taskId: string): Promise<string> {
   return res.text();
 }
 
+export function videoUrl(taskId: string): string {
+  return `${API_BASE}/api/tasks/${taskId}/video`;
+}
+
+export function overlayUrl(taskId: string): string {
+  return `${API_BASE}/api/tasks/${taskId}/overlay`;
+}
+
 export function wsUrl(taskId: string): string {
   const base = API_BASE.replace(/^http/, "ws");
   return `${base}/api/ws/tasks/${taskId}`;

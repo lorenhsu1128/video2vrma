@@ -24,6 +24,7 @@ class TaskState:
     message: str = ""
     video_path: str | None = None
     pkl_path: str | None = None
+    overlay_path: str | None = None
     bvh_path: str | None = None
     tracks: list[dict] | None = None
     error: str | None = None
@@ -110,7 +111,7 @@ class TaskManager:
         ]
         for tid in expired:
             task = self.tasks.pop(tid)
-            for path_attr in ("video_path", "pkl_path", "bvh_path"):
+            for path_attr in ("video_path", "pkl_path", "overlay_path", "bvh_path"):
                 p = getattr(task, path_attr, None)
                 if p:
                     Path(p).unlink(missing_ok=True)

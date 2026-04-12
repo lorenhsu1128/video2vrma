@@ -1,19 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ConversionPanel } from "@/components/ConversionPanel";
 import { ProgressDisplay } from "@/components/ProgressDisplay";
+import { ReviewPanel } from "@/components/ReviewPanel";
 import { SystemStats } from "@/components/SystemStats";
 import { TrackSelector } from "@/components/TrackSelector";
 import { VideoUploader } from "@/components/VideoUploader";
-import { VrmPreview } from "@/components/VrmPreview";
 import { useTaskProgress } from "@/hooks/useTaskProgress";
 import {
   TrackInfo,
   downloadBvhText,
   getTracks,
+  overlayUrl,
   postConvert,
+  videoUrl,
 } from "@/services/apiClient";
 import { bvhTextToVrmaBlob } from "@/services/bvhToVrma";
 
@@ -29,6 +31,15 @@ export default function Home() {
 
   const progress = useTaskProgress(taskId);
 
+  const srcVideoUrl = useMemo(() => (taskId ? videoUrl(taskId) : null), [taskId]);
+  const srcOverlayUrl = useMemo(
+    () =>
+      taskId && progress.step && !["queued", "detecting"].includes(progress.step)
+        ? overlayUrl(taskId)
+        : null,
+    [taskId, progress.step],
+  );
+
   const onUploaded = useCallback((id: string, name: string) => {
     setTaskId(id);
     setFileName(name);
@@ -39,7 +50,6 @@ export default function Home() {
     setPageError(null);
   }, []);
 
-  // tracks_ready 後抓 track 列表
   useEffect(() => {
     if (!taskId || progress.step !== "tracks_ready" || tracks !== null) return;
     let cancelled = false;
@@ -58,7 +68,6 @@ export default function Home() {
     };
   }, [taskId, progress.step, tracks]);
 
-  // bvh_ready 後下載 BVH 並轉 VRMA 給預覽用
   useEffect(() => {
     if (!taskId || progress.step !== "bvh_ready" || vrmaBlob) return;
     let cancelled = false;
@@ -117,7 +126,7 @@ export default function Home() {
     a.download = `${stem}.vrma`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [vrmaBlob, taskId]);
+  }, [vrmaBlob, fileName, taskId]);
 
   const onReset = useCallback(() => {
     setTaskId(null);
@@ -136,7 +145,7 @@ export default function Home() {
     (progress.step === "tracks_ready" || progress.step === "bvh_ready");
 
   return (
-    <main style={{ padding: "2rem", fontFamily: "sans-serif", maxWidth: 1080, margin: "0 auto" }}>
+    <main style={{ padding: "2rem", fontFamily: "sans-serif", maxWidth: "100%", margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
         <h1 style={{ margin: 0 }}>video2vrma</h1>
         <SystemStats />
@@ -206,13 +215,17 @@ export default function Home() {
         </section>
       )}
 
-      <section style={{ border: "1px solid #444", borderRadius: 4, overflow: "hidden" }}>
-        <VrmPreview vrmUrl="/models/default.vrm" vrmaBlob={vrmaBlob} />
+      <section style={{ marginBottom: 16 }}>
+        <ReviewPanel
+          videoUrl={srcVideoUrl}
+          overlayUrl={srcOverlayUrl}
+          vrmaBlob={vrmaBlob}
+          vrmUrl="/models/default.vrm"
+        />
       </section>
 
-      <p style={{ marginTop: "1rem", color: "#666", fontSize: "0.85em" }}>
-        滑鼠拖曳可旋轉相機、滾輪縮放。後端 API base：{" "}
-        <code>{process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000"}</code>
+      <p style={{ marginTop: "0.5rem", color: "#666", fontSize: "0.85em" }}>
+        滑鼠拖曳可旋轉 VRM 相機、滾輪縮放。
       </p>
     </main>
   );

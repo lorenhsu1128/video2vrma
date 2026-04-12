@@ -14,12 +14,18 @@ def step1_detect(
     output_dir: str | Path,
     end_frame: int = DEFAULT_END_FRAME,
 ) -> dict:
-    """跑 PHALP，回傳 {pkl, tracks}：tracks 是按 frame_count 排序的 meta 列表。"""
+    """跑 PHALP → overlay → 回傳 {pkl, tracks, overlay}。"""
     video_path = Path(video_path).resolve()
     output_dir = Path(output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     pkl_path = run_phalp(video_path, output_dir / "phalp", end_frame=end_frame)
-    return {"pkl": pkl_path, "tracks": list_tracks_meta(pkl_path)}
+    overlay_path = output_dir / f"{video_path.stem}_overlay.mp4"
+    render_overlay_video(pkl_path=pkl_path, output_mp4=overlay_path, fps=DEFAULT_FPS)
+    return {
+        "pkl": pkl_path,
+        "tracks": list_tracks_meta(pkl_path),
+        "overlay": overlay_path,
+    }
 
 
 def step2_convert(

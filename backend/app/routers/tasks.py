@@ -69,6 +69,22 @@ async def download_bvh(request: Request, task_id: str) -> FileResponse:
     )
 
 
+@router.get("/tasks/{task_id}/video")
+async def serve_video(request: Request, task_id: str) -> FileResponse:
+    task = _get_task_or_404(request, task_id)
+    if not task.video_path or not Path(task.video_path).exists():
+        raise HTTPException(404, "video not found")
+    return FileResponse(task.video_path, media_type="video/mp4")
+
+
+@router.get("/tasks/{task_id}/overlay")
+async def serve_overlay(request: Request, task_id: str) -> FileResponse:
+    task = _get_task_or_404(request, task_id)
+    if not task.overlay_path or not Path(task.overlay_path).exists():
+        raise HTTPException(404, "overlay not ready")
+    return FileResponse(task.overlay_path, media_type="video/mp4")
+
+
 @router.websocket("/ws/tasks/{task_id}")
 async def ws_task(ws: WebSocket, task_id: str) -> None:
     await ws.accept()

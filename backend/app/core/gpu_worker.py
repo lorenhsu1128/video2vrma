@@ -67,6 +67,8 @@ class GPUWorker:
         )
         task.pkl_path = str(result["pkl"])
         task.tracks = result["tracks"]
+        if result.get("overlay"):
+            task.overlay_path = str(result["overlay"])
         await self.task_manager.update_progress(
             task_id,
             TaskStep.TRACKS_READY,

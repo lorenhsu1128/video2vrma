@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
@@ -11,23 +11,63 @@ import {
   VRMAnimation,
 } from "@pixiv/three-vrm-animation";
 
+export type VrmPreviewHandle = {
+  play: () => void;
+  pause: () => void;
+  reset: () => void;
+  getDuration: () => number;
+};
+
 type Props = {
   vrmUrl: string;
   vrmaBlob: Blob | null;
+  autoPlay?: boolean;
 };
 
-export function VrmPreview({ vrmUrl, vrmaBlob }: Props) {
+export const VrmPreview = forwardRef<VrmPreviewHandle, Props>(function VrmPreview(
+  { vrmUrl, vrmaBlob, autoPlay = true },
+  ref,
+) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const mixerRef = useRef<THREE.AnimationMixer | null>(null);
+  const actionRef = useRef<THREE.AnimationAction | null>(null);
   const clockRef = useRef<THREE.Clock>(new THREE.Clock());
   const animationRef = useRef<number | null>(null);
   const vrmRef = useRef<VRM | null>(null);
+  const durationRef = useRef(0);
 
   const [vrm, setVrm] = useState<VRM | null>(null);
   const [status, setStatus] = useState<string>("初始化中");
+
+  useImperativeHandle(ref, () => ({
+    play() {
+      const action = actionRef.current;
+      if (action) {
+        action.paused = false;
+        clockRef.current.start();
+      }
+    },
+    pause() {
+      const action = actionRef.current;
+      if (action) {
+        action.paused = true;
+      }
+    },
+    reset() {
+      const action = actionRef.current;
+      if (action) {
+        action.reset();
+        action.paused = true;
+        if (mixerRef.current) mixerRef.current.setTime(0);
+      }
+    },
+    getDuration() {
+      return durationRef.current;
+    },
+  }));
 
   useEffect(() => {
     const container = containerRef.current;
@@ -76,8 +116,6 @@ export function VrmPreview({ vrmUrl, vrmaBlob }: Props) {
           return;
         }
         scene.add(loaded.scene);
-        // VRM 預設 rest pose 面向 +Z (VRM 規格)，但我們的相機在 +Z 往 -Z 看，
-        // 所以實際上 rest pose 是背對相機；加 Y 180° 讓角色正面朝相機
         loaded.scene.rotation.y = Math.PI;
         vrmRef.current = loaded;
         setVrm(loaded);
@@ -98,26 +136,25 @@ export function VrmPreview({ vrmUrl, vrmaBlob }: Props) {
       animationRef.current = requestAnimationFrame(tick);
       const dt = clockRef.current.getDelta();
       if (mixerRef.current) mixerRef.current.update(dt);
-      // vrm.update 必須在 mixer.update 之後呼叫，才能 apply humanoid bone pose
       if (vrmRef.current) vrmRef.current.update(dt);
       controls.update();
       renderer.render(scene, camera);
     };
     tick();
 
-    const onResize = () => {
+    const ro = new ResizeObserver(() => {
       if (!containerRef.current || !rendererRef.current || !cameraRef.current) return;
       const nw = containerRef.current.clientWidth;
       const nh = containerRef.current.clientHeight || 480;
       rendererRef.current.setSize(nw, nh);
       cameraRef.current.aspect = nw / nh;
       cameraRef.current.updateProjectionMatrix();
-    };
-    window.addEventListener("resize", onResize);
+    });
+    ro.observe(container);
 
     return () => {
+      ro.disconnect();
       if (animationRef.current != null) cancelAnimationFrame(animationRef.current);
-      window.removeEventListener("resize", onResize);
       renderer.dispose();
       if (renderer.domElement.parentNode) {
         renderer.domElement.parentNode.removeChild(renderer.domElement);
@@ -150,9 +187,19 @@ export function VrmPreview({ vrmUrl, vrmaBlob }: Props) {
         }
         if (mixerRef.current) mixerRef.current.stopAllAction();
         const mixer = new THREE.AnimationMixer(vrm.scene);
-        mixer.clipAction(clip).play();
+        const action = mixer.clipAction(clip);
+        action.setLoop(THREE.LoopOnce, 1);
+        action.clampWhenFinished = true;
+        if (autoPlay) {
+          action.play();
+        } else {
+          action.play();
+          action.paused = true;
+        }
         mixerRef.current = mixer;
-        setStatus(`播放中：${clip.tracks.length} tracks / ${clip.duration.toFixed(2)}s`);
+        actionRef.current = action;
+        durationRef.current = clip.duration;
+        setStatus(`就緒：${clip.tracks.length} tracks / ${clip.duration.toFixed(2)}s`);
       },
       undefined,
       (err) => {
@@ -161,7 +208,7 @@ export function VrmPreview({ vrmUrl, vrmaBlob }: Props) {
         setStatus("VRMA 載入錯誤（見 console）");
       },
     );
-  }, [vrm, vrmaBlob]);
+  }, [vrm, vrmaBlob, autoPlay]);
 
   return (
     <div>
@@ -171,4 +218,4 @@ export function VrmPreview({ vrmUrl, vrmaBlob }: Props) {
       <div ref={containerRef} style={{ width: "100%", height: 480 }} />
     </div>
   );
-}
+});
