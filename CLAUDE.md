@@ -21,6 +21,7 @@ video2vrma：MP4 影片 → 人體動態捕捉 → VRMA 動畫格式。後端 Fa
 3. **GPU 測試慎跑**：單一任務耗數十秒~數分鐘，不要在無關修改後反射性跑 e2e；先用最小重現案例。
 4. **NumPy 2.x 相容性**：遇到 `np.float` / `np.int` 等已移除 API，優先 patch 呼叫端，不要降版 NumPy。
 5. **根因優先**：不用 try/except 吞錯誤，不用 `--no-verify` 繞過 hooks，不用 `git reset --hard` 除非使用者明說。
+6. **PHALP→BVH→VRM pipeline 座標系** (lesson 0006)：PHALP `global_orient` 是相機座標 (Y down, Z fwd)，寫進 BVH 前要 `diag(1,-1,-1)` 轉；前端 `vrm.scene.rotation.y = Math.PI` 讓角色面對相機；bvh2vrma 的 hips position track 會把 VRM hips 拉到原點必須拿掉但 auto-grounding 要保留；VRM 載入後要用 React state 不只用 ref，`vrm.update(dt)` 必須每 frame 呼叫。
 
 ## 開發工作流程
 
