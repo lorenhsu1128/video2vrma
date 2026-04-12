@@ -22,6 +22,7 @@ export default function Home() {
   const [fileName, setFileName] = useState<string | null>(null);
   const [tracks, setTracks] = useState<TrackInfo[] | null>(null);
   const [selectedTrack, setSelectedTrack] = useState<number | null>(null);
+  const [bvhText, setBvhText] = useState<string | null>(null);
   const [vrmaBlob, setVrmaBlob] = useState<Blob | null>(null);
   const [busy, setBusy] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
@@ -33,6 +34,7 @@ export default function Home() {
     setFileName(name);
     setTracks(null);
     setSelectedTrack(null);
+    setBvhText(null);
     setVrmaBlob(null);
     setPageError(null);
   }, []);
@@ -64,6 +66,7 @@ export default function Home() {
       try {
         const bvh = await downloadBvhText(taskId);
         if (cancelled) return;
+        setBvhText(bvh);
         const blob = await bvhTextToVrmaBlob(bvh, { scale: 0.01 });
         if (!cancelled) setVrmaBlob(blob);
       } catch (e) {
@@ -80,6 +83,7 @@ export default function Home() {
       if (!taskId || selectedTrack == null) return;
       setBusy(true);
       setPageError(null);
+      setBvhText(null);
       setVrmaBlob(null);
       try {
         await postConvert(taskId, { track_id: selectedTrack, fps, smoothing });
@@ -92,12 +96,25 @@ export default function Home() {
     [taskId, selectedTrack],
   );
 
+  const onDownloadBvh = useCallback(() => {
+    if (!bvhText) return;
+    const blob = new Blob([bvhText], { type: "application/octet-stream" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const stem = fileName ? fileName.replace(/\.[^.]+$/, "") : (taskId ?? "output");
+    a.download = `${stem}.bvh`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [bvhText, fileName, taskId]);
+
   const onDownloadVrma = useCallback(() => {
     if (!vrmaBlob) return;
     const url = URL.createObjectURL(vrmaBlob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${taskId ?? "output"}.vrma`;
+    const stem = fileName ? fileName.replace(/\.[^.]+$/, "") : (taskId ?? "output");
+    a.download = `${stem}.vrma`;
     a.click();
     URL.revokeObjectURL(url);
   }, [vrmaBlob, taskId]);
@@ -107,6 +124,7 @@ export default function Home() {
     setFileName(null);
     setTracks(null);
     setSelectedTrack(null);
+    setBvhText(null);
     setVrmaBlob(null);
     setPageError(null);
   }, []);
@@ -147,6 +165,7 @@ export default function Home() {
             progress={progress.progress}
             message={progress.message}
             error={progress.error}
+            fileName={fileName}
           />
         </section>
       )}
@@ -172,11 +191,18 @@ export default function Home() {
         <pre style={{ color: "#c33", background: "#fee", padding: 12, overflow: "auto" }}>{pageError}</pre>
       )}
 
-      {vrmaBlob && (
-        <section style={{ marginBottom: 8 }}>
-          <button onClick={onDownloadVrma}>
-            下載 VRMA ({Math.round(vrmaBlob.size / 1024)} KB)
-          </button>
+      {(bvhText || vrmaBlob) && (
+        <section style={{ marginBottom: 8, display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {bvhText && (
+            <button onClick={onDownloadBvh} style={dlBtnStyle}>
+              下載 BVH ({Math.round(bvhText.length / 1024)} KB)
+            </button>
+          )}
+          {vrmaBlob && (
+            <button onClick={onDownloadVrma} style={dlBtnStyle}>
+              下載 VRMA ({Math.round(vrmaBlob.size / 1024)} KB)
+            </button>
+          )}
         </section>
       )}
 
@@ -191,3 +217,12 @@ export default function Home() {
     </main>
   );
 }
+
+const dlBtnStyle: React.CSSProperties = {
+  padding: "6px 14px",
+  background: "#3a6",
+  color: "#fff",
+  border: "none",
+  borderRadius: 4,
+  cursor: "pointer",
+};

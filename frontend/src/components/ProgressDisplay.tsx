@@ -24,9 +24,10 @@ type Props = {
   progress: number;
   message: string;
   error: string | null;
+  fileName?: string | null;
 };
 
-export function ProgressDisplay({ step, progress, message, error }: Props) {
+export function ProgressDisplay({ step, progress, message, error, fileName }: Props) {
   const idx = step ? STEP_ORDER.indexOf(step) : -1;
   const pct = Math.round(progress * 100);
 
@@ -65,6 +66,7 @@ export function ProgressDisplay({ step, progress, message, error }: Props) {
         />
       </div>
       <div style={{ marginTop: 6, fontSize: "0.85em", color: "#555" }}>
+        {fileName && <strong style={{ marginRight: 6 }}>{fileName}</strong>}
         {step ? STEP_LABELS[step] : "等待中"} — {message || `${pct}%`}
       </div>
       {error && (
