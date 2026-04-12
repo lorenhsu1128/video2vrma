@@ -24,6 +24,8 @@ class TaskState:
     progress: float = 0.0
     message: str = ""
     video_path: str | None = None
+    start_frame: int = 0
+    end_frame: int = -1
     pkl_path: str | None = None
     overlay_path: str | None = None
     bvh_path: str | None = None

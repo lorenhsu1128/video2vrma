@@ -2,21 +2,18 @@
 
 import { useCallback, useState } from "react";
 
-import { uploadVideo } from "@/services/apiClient";
-
 const ALLOWED = [".mp4", ".mov", ".avi", ".mkv", ".webm"];
 
 type Props = {
   disabled?: boolean;
-  onUploaded: (taskId: string, fileName: string) => void;
+  onFileSelected: (file: File) => void;
 };
 
-export function VideoUploader({ disabled, onUploaded }: Props) {
-  const [busy, setBusy] = useState(false);
+export function VideoUploader({ disabled, onFileSelected }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const onChange = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
+    (e: React.ChangeEvent<HTMLInputElement>) => {
       setError(null);
       const file = e.target.files?.[0];
       if (!file) return;
@@ -25,17 +22,9 @@ export function VideoUploader({ disabled, onUploaded }: Props) {
         setError(`不支援的格式 ${ext}`);
         return;
       }
-      setBusy(true);
-      try {
-        const { task_id } = await uploadVideo(file);
-        onUploaded(task_id, file.name);
-      } catch (err) {
-        setError(String(err));
-      } finally {
-        setBusy(false);
-      }
+      onFileSelected(file);
     },
-    [onUploaded],
+    [onFileSelected],
   );
 
   return (
@@ -46,11 +35,10 @@ export function VideoUploader({ disabled, onUploaded }: Props) {
           type="file"
           accept={ALLOWED.join(",")}
           onChange={onChange}
-          disabled={disabled || busy}
+          disabled={disabled}
           style={{ marginLeft: 8 }}
         />
       </label>
-      {busy && <span style={{ marginLeft: 12 }}>上傳中…</span>}
       {error && (
         <div style={{ color: "#c33", marginTop: 4, fontSize: "0.9em" }}>{error}</div>
       )}

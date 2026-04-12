@@ -7,6 +7,7 @@ import { ProgressDisplay } from "@/components/ProgressDisplay";
 import { ReviewPanel } from "@/components/ReviewPanel";
 import { SystemStats } from "@/components/SystemStats";
 import { TrackSelector } from "@/components/TrackSelector";
+import { VideoTrimmer } from "@/components/VideoTrimmer";
 import { VideoUploader } from "@/components/VideoUploader";
 import { useTaskProgress } from "@/hooks/useTaskProgress";
 import {
@@ -15,11 +16,13 @@ import {
   getTracks,
   overlayUrl,
   postConvert,
+  uploadVideo,
   videoUrl,
 } from "@/services/apiClient";
 import { bvhTextToVrmaBlob } from "@/services/bvhToVrma";
 
 export default function Home() {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [tracks, setTracks] = useState<TrackInfo[] | null>(null);
@@ -42,14 +45,37 @@ export default function Home() {
     [taskId, progress.step],
   );
 
-  const onUploaded = useCallback((id: string, name: string) => {
-    setTaskId(id);
-    setFileName(name);
+  const onFileSelected = useCallback((file: File) => {
+    setSelectedFile(file);
+    setTaskId(null);
+    setFileName(null);
     setTracks(null);
     setSelectedTrack(null);
     setBvhText(null);
     setVrmaBlob(null);
     setPageError(null);
+  }, []);
+
+  const onStartConvert = useCallback(
+    async (file: File, startTime: number, endTime: number) => {
+      setBusy(true);
+      setPageError(null);
+      try {
+        const { task_id } = await uploadVideo(file, startTime, endTime);
+        setTaskId(task_id);
+        setFileName(file.name);
+        setSelectedFile(null);
+      } catch (err) {
+        setPageError(String(err));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [],
+  );
+
+  const onCancelTrim = useCallback(() => {
+    setSelectedFile(null);
   }, []);
 
   useEffect(() => {
@@ -131,6 +157,7 @@ export default function Home() {
   }, [vrmaBlob, fileName, taskId]);
 
   const onReset = useCallback(() => {
+    setSelectedFile(null);
     setTaskId(null);
     setFileName(null);
     setTracks(null);
@@ -153,11 +180,23 @@ export default function Home() {
         <SystemStats />
       </div>
       <p style={{ color: "#666" }}>
-        上傳 MP4 影片 → PHALP 偵測人物 → 選 track → 轉 BVH → 瀏覽器內轉 VRMA → 套到 VRM 預覽
+        上傳 MP4 影片 → 設定轉換時間段 → PHALP 偵測人物 → 選 track → 轉 BVH → 瀏覽器內轉 VRMA → 套到 VRM 預覽
       </p>
 
       <section style={{ marginBottom: 16 }}>
-        <VideoUploader disabled={busy || (taskId !== null && progress.step !== "bvh_ready" && progress.step !== "error")} onUploaded={onUploaded} />
+        {!selectedFile && !taskId && (
+          <VideoUploader disabled={busy} onFileSelected={onFileSelected} />
+        )}
+
+        {selectedFile && !taskId && (
+          <VideoTrimmer
+            file={selectedFile}
+            disabled={busy}
+            onStart={onStartConvert}
+            onCancel={onCancelTrim}
+          />
+        )}
+
         {taskId && (
           <div style={{ marginTop: 6, fontSize: "0.85em", color: "#666" }}>
             task: <code>{taskId}</code>

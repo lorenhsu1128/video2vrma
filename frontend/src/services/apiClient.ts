@@ -53,9 +53,15 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
   return (await res.json()) as T;
 }
 
-export async function uploadVideo(file: File): Promise<{ task_id: string }> {
+export async function uploadVideo(
+  file: File,
+  startTime?: number,
+  endTime?: number,
+): Promise<{ task_id: string }> {
   const fd = new FormData();
   fd.append("file", file);
+  if (startTime != null && startTime > 0) fd.append("start_time", String(startTime));
+  if (endTime != null && endTime > 0) fd.append("end_time", String(endTime));
   const res = await fetch(`${API_BASE}/api/upload`, { method: "POST", body: fd });
   return jsonOrThrow(res);
 }

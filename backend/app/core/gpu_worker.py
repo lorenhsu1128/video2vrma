@@ -61,9 +61,9 @@ class GPUWorker:
         out_dir = self.work_dir / task_id
         result = await loop.run_in_executor(
             self.executor,
-            self.pipeline.step1_detect,
-            task.video_path,
-            out_dir,
+            lambda: self.pipeline.step1_detect(
+                task.video_path, out_dir, end_frame=task.end_frame,
+            ),
         )
         task.pkl_path = str(result["pkl"])
         task.tracks = result["tracks"]
