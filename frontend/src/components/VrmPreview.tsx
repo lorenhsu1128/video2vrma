@@ -33,7 +33,8 @@ export const VrmPreview = forwardRef<VrmPreviewHandle, Props>(function VrmPrevie
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const mixerRef = useRef<THREE.AnimationMixer | null>(null);
-  const actionRef = useRef<THREE.AnimationAction | null>(null);
+  const clipRef = useRef<THREE.AnimationClip | null>(null);
+  const playingRef = useRef(false);
   const clockRef = useRef<THREE.Clock>(new THREE.Clock());
   const animationRef = useRef<number | null>(null);
   const vrmRef = useRef<VRM | null>(null);
@@ -42,33 +43,35 @@ export const VrmPreview = forwardRef<VrmPreviewHandle, Props>(function VrmPrevie
   const [vrm, setVrm] = useState<VRM | null>(null);
   const [status, setStatus] = useState<string>("初始化中");
 
+  const _startFresh = () => {
+    const currentVrm = vrmRef.current;
+    const clip = clipRef.current;
+    if (!currentVrm || !clip) return;
+
+    if (mixerRef.current) mixerRef.current.stopAllAction();
+    const mixer = new THREE.AnimationMixer(currentVrm.scene);
+    const action = mixer.clipAction(clip);
+    action.setLoop(THREE.LoopOnce, 1);
+    action.clampWhenFinished = true;
+    action.play();
+    mixerRef.current = mixer;
+    playingRef.current = true;
+    clockRef.current.getDelta();
+  };
+
   useImperativeHandle(ref, () => ({
     play() {
-      const action = actionRef.current;
-      if (action) {
-        // action.reset() 重新排程 _startTime 到 mixer 當前時間，避免
-        // 累積的 mixer time 讓 action 一開始就跳到結尾。
-        action.reset();
-        action.setLoop(THREE.LoopOnce, 1);
-        action.clampWhenFinished = true;
-        action.play();
-      }
+      _startFresh();
     },
     pause() {
-      const action = actionRef.current;
-      if (action) {
-        action.paused = true;
-      }
+      playingRef.current = false;
     },
     reset() {
-      const action = actionRef.current;
-      if (action) {
-        action.reset();
-        action.setLoop(THREE.LoopOnce, 1);
-        action.clampWhenFinished = true;
-        action.play();
-        action.paused = true;
+      if (mixerRef.current) {
+        mixerRef.current.stopAllAction();
+        mixerRef.current.setTime(0);
       }
+      playingRef.current = false;
     },
     getDuration() {
       return durationRef.current;
@@ -141,7 +144,9 @@ export const VrmPreview = forwardRef<VrmPreviewHandle, Props>(function VrmPrevie
     const tick = () => {
       animationRef.current = requestAnimationFrame(tick);
       const dt = clockRef.current.getDelta();
-      if (mixerRef.current) mixerRef.current.update(dt);
+      if (mixerRef.current && playingRef.current) {
+        mixerRef.current.update(dt);
+      }
       if (vrmRef.current) vrmRef.current.update(dt);
       controls.update();
       renderer.render(scene, camera);
@@ -191,20 +196,16 @@ export const VrmPreview = forwardRef<VrmPreviewHandle, Props>(function VrmPrevie
           setStatus("VRMA clip 沒有任何 track");
           return;
         }
-        if (mixerRef.current) mixerRef.current.stopAllAction();
-        const mixer = new THREE.AnimationMixer(vrm.scene);
-        const action = mixer.clipAction(clip);
-        action.setLoop(THREE.LoopOnce, 1);
-        action.clampWhenFinished = true;
-        if (autoPlay) {
-          action.play();
-        } else {
-          action.play();
-          action.paused = true;
-        }
-        mixerRef.current = mixer;
-        actionRef.current = action;
+        clipRef.current = clip;
         durationRef.current = clip.duration;
+
+        if (autoPlay) {
+          _startFresh();
+        } else {
+          if (mixerRef.current) mixerRef.current.stopAllAction();
+          mixerRef.current = null;
+          playingRef.current = false;
+        }
         setStatus(`就緒：${clip.tracks.length} tracks / ${clip.duration.toFixed(2)}s`);
       },
       undefined,
