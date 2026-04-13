@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Props = {
   disabled?: boolean;
+  defaultFps?: number;
   onConvert: (opts: { fps: number; smoothing: boolean }) => void;
 };
 
-export function ConversionPanel({ disabled, onConvert }: Props) {
-  const [fps, setFps] = useState(30);
+export function ConversionPanel({ disabled, defaultFps = 30, onConvert }: Props) {
+  const [fps, setFps] = useState(defaultFps);
+  useEffect(() => { setFps(defaultFps); }, [defaultFps]);
   const [smoothing, setSmoothing] = useState(false);
 
   return (

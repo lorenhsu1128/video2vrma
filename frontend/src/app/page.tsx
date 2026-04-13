@@ -307,7 +307,7 @@ export default function Home() {
 
       {tracks && tracks.length > 0 && (
         <section style={{ marginBottom: 16 }}>
-          <ConversionPanel disabled={!canConvert} onConvert={onConvert} />
+          <ConversionPanel disabled={!canConvert} defaultFps={detectionFps} onConvert={onConvert} />
         </section>
       )}
 
