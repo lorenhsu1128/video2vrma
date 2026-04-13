@@ -26,6 +26,8 @@ export default function Home() {
   const [taskId, setTaskId] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [tracks, setTracks] = useState<TrackInfo[] | null>(null);
+  const [detectionFps, setDetectionFps] = useState(30);
+  const [totalFrames, setTotalFrames] = useState(0);
   const [selectedTrack, setSelectedTrack] = useState<number | null>(null);
   const [bvhText, setBvhText] = useState<string | null>(null);
   const [vrmaBlob, setVrmaBlob] = useState<Blob | null>(null);
@@ -84,6 +86,8 @@ export default function Home() {
         const res = await getTracks(taskId);
         if (cancelled) return;
         setTracks(res.tracks);
+        setDetectionFps(res.detection_fps);
+        setTotalFrames(res.total_frames);
         if (res.tracks.length > 0) setSelectedTrack(res.tracks[0].track_id);
       } catch (e) {
         if (!cancelled) setPageError(String(e));
@@ -176,6 +180,15 @@ export default function Home() {
     ? { file: selectedFile, disabled: busy, onStart: onStartConvert }
     : null;
 
+  const selectedTrackInfo = tracks?.find((t) => t.track_id === selectedTrack);
+  const trackTiming = selectedTrackInfo
+    ? {
+        startFrame: selectedTrackInfo.start_frame,
+        totalFrames,
+        detectionFps,
+      }
+    : null;
+
   return (
     <main style={{ padding: "2rem", fontFamily: "sans-serif", maxWidth: "100%", margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
@@ -257,6 +270,7 @@ export default function Home() {
           vrmUrl="/models/default.vrm"
           trim={trimConfig}
           clip={clipInfo}
+          trackTiming={trackTiming}
         />
       </section>
 

@@ -30,6 +30,7 @@ class TaskState:
     overlay_path: str | None = None
     bvh_path: str | None = None
     tracks: list[dict] | None = None
+    total_frames: int = 0
     error: str | None = None
     created_at: datetime = field(default_factory=datetime.now)
 

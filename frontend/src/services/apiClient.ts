@@ -26,11 +26,14 @@ export type TaskStatus = {
 export type TrackInfo = {
   track_id: number;
   frame_count: number;
+  start_frame: number;
 };
 
 export type TracksResponse = {
   task_id: string;
   tracks: TrackInfo[];
+  detection_fps: number;
+  total_frames: number;
 };
 
 export type ConvertRequest = {

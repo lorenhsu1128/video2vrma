@@ -59,9 +59,21 @@ def extract_track(pkl_path: str | Path, track_id: int) -> np.ndarray:
     return smpl_track_to_axis_angle(tracks[track_id])
 
 
-def list_tracks_meta(pkl_path: str | Path) -> list[dict]:
-    """每個 track 的 (track_id, frame_count)，依長度由大到小排序。"""
+def list_tracks_meta(pkl_path: str | Path) -> tuple[list[dict], int]:
+    """每個 track 的 meta（含 start_frame），依長度由大到小排序。
+
+    Returns:
+        (tracks_list, total_frames) — total_frames 是 PHALP 偵測的總幀數。
+    """
     data = load_phalp_pkl(pkl_path)
     tracks = collect_tracks(data)
+    total_frames = len(sorted(data.keys()))
     items = sorted(tracks.items(), key=lambda kv: -len(kv[1]))
-    return [{"track_id": int(tid), "frame_count": len(seq)} for tid, seq in items]
+    return [
+        {
+            "track_id": int(tid),
+            "frame_count": len(seq),
+            "start_frame": seq[0][0],
+        }
+        for tid, seq in items
+    ], total_frames

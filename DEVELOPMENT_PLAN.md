@@ -729,6 +729,7 @@ video2vrma/
 - [x] 5b.6 影片時間段選擇器：上傳前可用 range slider 設定起始與結束點，支援 playhead 拖曳
 - [x] 5b.7 裁切區段整合到 ReviewPanel：轉換前預覽裁切片段 loop，轉換後三窗格同步播放裁切區段
 - [x] 5b.8 修正 start_frame 未傳入 PHALP pipeline：選中間區段時 PHALP 只處理該區段（修正雙層幀過濾 bug）
+- [x] 5b.9 修正後半段 track 同步播放不可見：傳遞 per-track start_frame，VRM 動畫依 overlay 時間軸精確偏移
 
 ### Phase 6：優化與錯誤處理
 

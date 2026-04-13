@@ -16,6 +16,7 @@ export type VrmPreviewHandle = {
   pause: () => void;
   reset: () => void;
   getDuration: () => number;
+  setTime: (t: number) => void;
 };
 
 type Props = {
@@ -59,6 +60,21 @@ export const VrmPreview = forwardRef<VrmPreviewHandle, Props>(function VrmPrevie
     clockRef.current.getDelta();
   };
 
+  const _ensureMixer = () => {
+    const currentVrm = vrmRef.current;
+    const clip = clipRef.current;
+    if (!currentVrm || !clip) return null;
+    if (!mixerRef.current) {
+      const mixer = new THREE.AnimationMixer(currentVrm.scene);
+      const action = mixer.clipAction(clip);
+      action.setLoop(THREE.LoopOnce, 1);
+      action.clampWhenFinished = true;
+      action.play();
+      mixerRef.current = mixer;
+    }
+    return mixerRef.current;
+  };
+
   useImperativeHandle(ref, () => ({
     play() {
       _startFresh();
@@ -75,6 +91,12 @@ export const VrmPreview = forwardRef<VrmPreviewHandle, Props>(function VrmPrevie
     },
     getDuration() {
       return durationRef.current;
+    },
+    setTime(t: number) {
+      const mixer = _ensureMixer();
+      if (!mixer) return;
+      playingRef.current = false;
+      mixer.setTime(Math.max(0, t));
     },
   }));
 

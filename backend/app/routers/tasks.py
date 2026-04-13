@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 
+from app.config import DEFAULT_FPS
 from app.core.task_manager import TaskStep
 from app.models.schemas import (
     ConvertRequest,
@@ -36,6 +37,8 @@ async def get_tracks(request: Request, task_id: str) -> TracksResponse:
     return TracksResponse(
         task_id=task_id,
         tracks=[TrackInfo(**t) for t in task.tracks],
+        detection_fps=DEFAULT_FPS,
+        total_frames=task.total_frames,
     )
 
 

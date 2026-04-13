@@ -20,7 +20,8 @@ def step1_detect(
     output_dir = Path(output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     pkl_path = run_phalp(video_path, output_dir / "phalp", start_frame=start_frame, end_frame=end_frame)
-    return {"pkl": pkl_path, "tracks": list_tracks_meta(pkl_path)}
+    tracks, total_frames = list_tracks_meta(pkl_path)
+    return {"pkl": pkl_path, "tracks": tracks, "total_frames": total_frames}
 
 
 def step1b_overlay(pkl_path: str | Path, output_dir: str | Path) -> Path:

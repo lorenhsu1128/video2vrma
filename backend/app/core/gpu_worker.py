@@ -69,6 +69,7 @@ class GPUWorker:
         )
         task.pkl_path = str(result["pkl"])
         task.tracks = result["tracks"]
+        task.total_frames = result.get("total_frames", 0)
 
         await self.task_manager.update_progress(
             task_id, TaskStep.RENDERING_OVERLAY, 0.5, "骨架 overlay 影片產生中…"

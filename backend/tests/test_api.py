@@ -21,9 +21,10 @@ class StubPipeline:
         return {
             "pkl": pkl,
             "tracks": [
-                {"track_id": 1, "frame_count": 100},
-                {"track_id": 2, "frame_count": 30},
+                {"track_id": 1, "frame_count": 100, "start_frame": 0},
+                {"track_id": 2, "frame_count": 30, "start_frame": 100},
             ],
+            "total_frames": 130,
         }
 
     def step1b_overlay(self, pkl_path, output_dir):

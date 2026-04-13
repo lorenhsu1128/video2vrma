@@ -16,11 +16,14 @@ class TaskStatus(BaseModel):
 class TrackInfo(BaseModel):
     track_id: int
     frame_count: int
+    start_frame: int = 0
 
 
 class TracksResponse(BaseModel):
     task_id: str
     tracks: list[TrackInfo]
+    detection_fps: int
+    total_frames: int
 
 
 class ConvertRequest(BaseModel):
