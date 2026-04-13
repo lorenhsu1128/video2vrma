@@ -853,6 +853,91 @@ error   → ERROR        → save ✓
 
 ---
 
+### Phase 8：間隔取幀加速與動畫補幀
+
+**目標：** 透過間隔取幀（`every_x_frame`）大幅縮短 PHALP 偵測時間，搭配兩階段流程讓使用者先快速預覽再精確轉換；可選的 SLERP 插值補幀提升動畫流暢度。
+
+**背景：** PHALP 偵測是整個 pipeline 最大瓶頸（192 幀 ≈ 6 分鐘），每幀約 2 秒 GPU 推理。間隔 5 幀可將偵測時間縮短至 ~1/5。
+
+**技術限制：**
+- `vendor/` 只讀 — PHALP 的 `every_x_frame=1` 硬寫在 `vendor/PHALP/phalp/utils/io.py:56`，需透過 monkey-patch 繞過
+- PHALP `extract_frames` 輸出的檔名是連續編號（img_cnt），pkl frame key 不反映實際影片幀號
+- 間隔取幀後 `track_extractor` 的 `start_frame` 是取樣後的 index，非原始幀號，需乘以 `frame_step` 換算
+- overlay FPS 需除以 `frame_step` 才能維持正確播放速度
+
+**Phase 8a：間隔取幀 + 兩階段流程（A+C 混合）**
+
+資料流變化：
+
+```
+上傳時選擇「快速模式」(frame_step=3~5)
+    ↓
+PHALP 只處理 1/N 幀（速度 ↑ N 倍）
+    ↓
+overlay FPS = native_fps / frame_step（播放速度正確）
+    ↓
+使用者預覽 track、選擇 → 可選「精確模式重跑」(frame_step=1)
+```
+
+後端改動（參數傳遞鏈）：
+
+```
+upload.py (frame_step Form param)
+  → task_manager.py (TaskState.frame_step)
+    → gpu_worker.py (傳給 step1_detect)
+      → pipeline.py (step1_detect 接受 frame_step)
+        → phalp_service.py (run_phalp 接受 every_x_frame)
+          → vendor_paths.py (monkey-patch extract_frames 讀取 cfg 欄位)
+```
+
+任務清單：
+
+- [ ] 8a.1 `vendor_paths.py`：monkey-patch `FrameExtractor.extract_frames` 或 `io.py` 的呼叫點，讓 `every_x_frame` 可從 PHALP cfg 讀取（而非硬寫 1）
+- [ ] 8a.2 `phalp_service.py`：`run_phalp()` 新增 `every_x_frame: int = 1` 參數，設定到 cfg 供 patch 讀取
+- [ ] 8a.3 `pipeline.py`：`step1_detect()` 新增 `frame_step: int = 1` 參數，傳給 `run_phalp(every_x_frame=frame_step)`
+- [ ] 8a.4 `pipeline.py`：`step1b_overlay()` 的 fps 改為 `fps / frame_step`，確保 overlay 播放速度正確
+- [ ] 8a.5 `task_manager.py`：`TaskState` 新增 `frame_step: int = 1`，加入 `to_persist_dict` / `from_persist_dict`
+- [ ] 8a.6 `upload.py`：接受 `frame_step: Optional[int] = Form(None)` 參數，存入 task
+- [ ] 8a.7 `gpu_worker.py`：`_process_detect` 傳 `frame_step=task.frame_step` 給 `step1_detect`；`step1b_overlay` 的 fps 也除以 `frame_step`
+- [ ] 8a.8 `track_extractor.py`：`list_tracks_meta` 回傳的 `start_frame` 需乘以 `frame_step` 還原為實際幀號（或另加 `raw_start_frame` 欄位）
+- [ ] 8a.9 `schemas.py`：`UploadResponse` 或 `TracksResponse` 加入 `frame_step` 欄位，讓前端知道取樣倍率
+- [ ] 8a.10 前端 `apiClient.ts`：`uploadVideo` 新增 `frameStep` 參數
+- [ ] 8a.11 前端 `page.tsx`：上傳區新增「快速模式」toggle（frame_step 選項：1 / 3 / 5），傳給 `uploadVideo`
+- [ ] 8a.12 前端 `page.tsx`：偵測完成後顯示「以精確模式重新偵測」按鈕（frame_step=1 重新上傳同一檔案）
+- [ ] 8a.13 `tests/test_api.py`：新增 frame_step 相關測試（stub pipeline 驗證參數傳遞）
+
+**驗收：**
+- `pytest` 全過
+- 上傳時選快速模式（frame_step=5），偵測速度明顯加快
+- overlay 播放速度與原始影片一致
+- BVH 轉換 FPS 自動適配（`native_fps / frame_step`）
+- 可切回精確模式重跑
+
+**Phase 8b：SLERP 插值補幀（可選，8a 完成後再做）**
+
+目標：對間隔取幀的 pose 資料做 quaternion SLERP 插值，補回原始幀率，提升動畫流暢度。
+
+```
+track_extractor 取出 N 幀 pose_aa (N, 24, 3)
+    ↓
+interpolation.py: axis-angle → quaternion → SLERP 補幀 → axis-angle
+    ↓
+輸出 N*frame_step 幀的 pose_aa，BVH 用原始 FPS 寫入
+```
+
+- [ ] 8b.1 新建 `backend/app/services/interpolation.py`：`interpolate_pose_aa(pose_aa, factor)` 函式，對每個 joint 做 quaternion SLERP 插值，補幀 `factor` 倍
+- [ ] 8b.2 `pipeline.py`：`step2_convert` 在 smoothing 之前/之後可選呼叫 `interpolate_pose_aa`
+- [ ] 8b.3 `schemas.py`：`ConvertRequest` 新增 `interpolate: bool = False` 欄位
+- [ ] 8b.4 前端 `ConversionPanel.tsx`：新增「插值補幀」checkbox（僅在 frame_step > 1 時顯示）
+- [ ] 8b.5 `tests/`：新增插值函式的單元測試（驗證幀數倍增、quaternion 正規化）
+
+**驗收：**
+- 間隔取幀 + 插值後的 VRMA 時長 = 原始影片時長
+- 動畫比不插值明顯更平滑
+- 快速動作的插值品質可接受（不出現嚴重扭曲）
+
+---
+
 ## CLAUDE.md 概要
 
 > 實際 CLAUDE.md 在專案根目錄，以下為概要摘錄。
