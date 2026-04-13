@@ -163,6 +163,8 @@ def render_overlay_video(
         tids = list(f.get("tid", []))
         joints_list = f.get("2d_joints", [])
         for idx, tid in enumerate(tids):
+            if idx >= len(joints_list):
+                break
             tid = int(tid)
             color = _track_color(tid)
             j2d = np.asarray(joints_list[idx]).reshape(-1, 2)[:25]
