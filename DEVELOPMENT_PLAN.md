@@ -846,8 +846,8 @@ error   → ERROR        → save ✓
 
 **Phase 7e：分享頁面**
 
-- [ ] 7e.1 新建 `app/r/[token]/page.tsx`：唯讀檢視 + 下載按鈕（BVH / VRMA）
-- [ ] 7e.2 分享頁可選顯示影片 / overlay / VRM 預覽（複用現有元件）
+- [x] 7e.1 新建 `app/r/[token]/page.tsx`：唯讀檢視 + 下載按鈕（BVH / VRMA）
+- [x] 7e.2 分享頁可選顯示影片 / overlay / VRM 預覽（複用現有元件）
 
 **驗收：** 開啟 `http://localhost:3000/r/{token}` 可看到任務資訊與下載按鈕
 
