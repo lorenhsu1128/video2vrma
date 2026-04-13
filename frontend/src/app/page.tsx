@@ -34,6 +34,8 @@ export default function Home() {
   const [selectedTrack, setSelectedTrack] = useState<number | null>(null);
   const [bvhText, setBvhText] = useState<string | null>(null);
   const [vrmaBlob, setVrmaBlob] = useState<Blob | null>(null);
+  const [frameStep, setFrameStep] = useState(1);
+  const [currentFrameStep, setCurrentFrameStep] = useState(1);
   const [busy, setBusy] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
   const [historyKey, setHistoryKey] = useState(0);
@@ -65,12 +67,17 @@ export default function Home() {
   }, []);
 
   const onStartConvert = useCallback(
-    async (file: File, startTime: number, endTime: number) => {
+    async (file: File, startTime: number, endTime: number, stepOverride?: number) => {
+      const step = stepOverride ?? frameStep;
       setBusy(true);
       setPageError(null);
       setClipInfo({ file, start: startTime, end: endTime });
+      setTracks(null);
+      setSelectedTrack(null);
+      setBvhText(null);
+      setVrmaBlob(null);
       try {
-        const { task_id, share_token } = await uploadVideo(file, startTime, endTime);
+        const { task_id, share_token } = await uploadVideo(file, startTime, endTime, step);
         setTaskId(task_id);
         setFileName(file.name);
         setShareToken(share_token);
@@ -82,7 +89,7 @@ export default function Home() {
         setBusy(false);
       }
     },
-    [],
+    [frameStep],
   );
 
   useEffect(() => {
@@ -95,6 +102,7 @@ export default function Home() {
         setTracks(res.tracks);
         setDetectionFps(res.detection_fps);
         setTotalFrames(res.total_frames);
+        setCurrentFrameStep(res.frame_step ?? 1);
         if (res.tracks.length > 0) setSelectedTrack(res.tracks[0].track_id);
       } catch (e) {
         if (!cancelled) setPageError(String(e));
@@ -166,6 +174,7 @@ export default function Home() {
           setTracks(res.tracks);
           setDetectionFps(res.detection_fps);
           setTotalFrames(res.total_frames);
+          setCurrentFrameStep(res.frame_step ?? 1);
           if (res.tracks.length > 0) setSelectedTrack(res.tracks[0].track_id);
         }
         if (st.status === "bvh_ready") {
@@ -265,9 +274,23 @@ export default function Home() {
       <section style={{ marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <VideoUploader disabled={busy || !!taskId} onFileSelected={onFileSelected} />
+          {!taskId && (
+            <label style={{ fontSize: "0.85em", color: "#666" }}>
+              frame step:
+              <select
+                value={frameStep}
+                onChange={(e) => setFrameStep(Number(e.target.value))}
+                style={{ marginLeft: 4 }}
+              >
+                <option value={1}>1 (full)</option>
+                <option value={3}>3 (fast)</option>
+                <option value={5}>5 (faster)</option>
+              </select>
+            </label>
+          )}
           {(selectedFile || taskId) && (
             <span style={{ fontSize: "0.85em", color: "#666" }}>
-              {taskId && <>task: <code>{taskId}</code> · </>}
+              {taskId && <>task: <code>{taskId}</code>{currentFrameStep > 1 && <> · step {currentFrameStep}</>} · </>}
               {fileName || selectedFile?.name}
               {shareToken && (
                 <button onClick={onCopyShareLink} style={{ marginLeft: 8, fontSize: "0.85em" }}>
@@ -306,8 +329,17 @@ export default function Home() {
       )}
 
       {tracks && tracks.length > 0 && (
-        <section style={{ marginBottom: 16 }}>
-          <ConversionPanel disabled={!canConvert} defaultFps={detectionFps} onConvert={onConvert} />
+        <section style={{ marginBottom: 16, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <ConversionPanel disabled={!canConvert} defaultFps={Math.round(detectionFps / currentFrameStep)} onConvert={onConvert} />
+          {currentFrameStep > 1 && clipInfo && (
+            <button
+              onClick={() => onStartConvert(clipInfo.file, clipInfo.start, clipInfo.end, 1)}
+              disabled={busy}
+              style={{ padding: "6px 14px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.85em" }}
+            >
+              re-detect (full frames)
+            </button>
+          )}
         </section>
       )}
 

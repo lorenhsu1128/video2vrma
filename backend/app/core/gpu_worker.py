@@ -66,6 +66,7 @@ class GPUWorker:
                 task.video_path, out_dir,
                 start_frame=task.start_frame,
                 end_frame=task.end_frame,
+                frame_step=task.frame_step,
             ),
         )
         task.pkl_path = str(result["pkl"])
@@ -79,7 +80,7 @@ class GPUWorker:
             overlay = await loop.run_in_executor(
                 self.executor,
                 lambda: self.pipeline.step1b_overlay(
-                    task.pkl_path, out_dir, fps=task.native_fps,
+                    task.pkl_path, out_dir, fps=task.native_fps / task.frame_step,
                 ),
             )
             task.overlay_path = str(overlay)

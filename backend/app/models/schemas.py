@@ -25,6 +25,7 @@ class TracksResponse(BaseModel):
     tracks: list[TrackInfo]
     detection_fps: int
     total_frames: int
+    frame_step: int = 1
 
 
 class ConvertRequest(BaseModel):

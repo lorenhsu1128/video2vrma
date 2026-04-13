@@ -892,19 +892,19 @@ upload.py (frame_step Form param)
 
 任務清單：
 
-- [ ] 8a.1 `vendor_paths.py`：monkey-patch `FrameExtractor.extract_frames` 或 `io.py` 的呼叫點，讓 `every_x_frame` 可從 PHALP cfg 讀取（而非硬寫 1）
-- [ ] 8a.2 `phalp_service.py`：`run_phalp()` 新增 `every_x_frame: int = 1` 參數，設定到 cfg 供 patch 讀取
-- [ ] 8a.3 `pipeline.py`：`step1_detect()` 新增 `frame_step: int = 1` 參數，傳給 `run_phalp(every_x_frame=frame_step)`
-- [ ] 8a.4 `pipeline.py`：`step1b_overlay()` 的 fps 改為 `fps / frame_step`，確保 overlay 播放速度正確
-- [ ] 8a.5 `task_manager.py`：`TaskState` 新增 `frame_step: int = 1`，加入 `to_persist_dict` / `from_persist_dict`
-- [ ] 8a.6 `upload.py`：接受 `frame_step: Optional[int] = Form(None)` 參數，存入 task
-- [ ] 8a.7 `gpu_worker.py`：`_process_detect` 傳 `frame_step=task.frame_step` 給 `step1_detect`；`step1b_overlay` 的 fps 也除以 `frame_step`
-- [ ] 8a.8 `track_extractor.py`：`list_tracks_meta` 回傳的 `start_frame` 需乘以 `frame_step` 還原為實際幀號（或另加 `raw_start_frame` 欄位）
-- [ ] 8a.9 `schemas.py`：`UploadResponse` 或 `TracksResponse` 加入 `frame_step` 欄位，讓前端知道取樣倍率
-- [ ] 8a.10 前端 `apiClient.ts`：`uploadVideo` 新增 `frameStep` 參數
-- [ ] 8a.11 前端 `page.tsx`：上傳區新增「快速模式」toggle（frame_step 選項：1 / 3 / 5），傳給 `uploadVideo`
-- [ ] 8a.12 前端 `page.tsx`：偵測完成後顯示「以精確模式重新偵測」按鈕（frame_step=1 重新上傳同一檔案）
-- [ ] 8a.13 `tests/test_api.py`：新增 frame_step 相關測試（stub pipeline 驗證參數傳遞）
+- [x] 8a.1 `vendor_paths.py`：monkey-patch `FrameExtractor.extract_frames`，讓 `every_x_frame` 透過全域變數控制（而非硬寫 1）
+- [x] 8a.2 `phalp_service.py`：`run_phalp()` 新增 `every_x_frame: int = 1` 參數，呼叫 `set_every_x_frame()` 設定
+- [x] 8a.3 `pipeline.py`：`step1_detect()` 新增 `frame_step: int = 1` 參數，傳給 `run_phalp(every_x_frame=frame_step)`
+- [x] 8a.4 `gpu_worker.py`：`step1b_overlay` 的 fps 除以 `frame_step`，確保 overlay 播放速度正確
+- [x] 8a.5 `task_manager.py`：`TaskState` 新增 `frame_step: int = 1`，加入 `to_persist_dict` / `from_persist_dict`
+- [x] 8a.6 `upload.py`：接受 `frame_step: Optional[int] = Form(None)` 參數，存入 task
+- [x] 8a.7 `gpu_worker.py`：`_process_detect` 傳 `frame_step=task.frame_step` 給 `step1_detect`
+- [ ] 8a.8 `track_extractor.py`：`list_tracks_meta` 回傳的 `start_frame` 需乘以 `frame_step` 還原為實際幀號（或另加 `raw_start_frame` 欄位）— 暫不需要，frame_step 模式下 start_frame 直接除以 detection_fps 仍可用
+- [x] 8a.9 `schemas.py`：`TracksResponse` 加入 `frame_step` 欄位
+- [x] 8a.10 前端 `apiClient.ts`：`uploadVideo` 新增 `frameStep` 參數，TracksResponse 加 `frame_step`
+- [x] 8a.11 前端 `page.tsx`：上傳區新增 frame step 選擇器（1 / 3 / 5），傳給 `uploadVideo`
+- [x] 8a.12 前端 `page.tsx`：偵測完成後顯示「re-detect (full frames)」按鈕（stepOverride=1 重新上傳同一檔案）
+- [x] 8a.13 `tests/test_api.py`：新增 frame_step 參數傳遞測試
 
 **驗收：**
 - `pytest` 全過

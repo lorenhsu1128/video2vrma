@@ -31,6 +31,7 @@ class TaskState:
     video_path: str | None = None
     start_frame: int = 0
     end_frame: int = -1
+    frame_step: int = 1
     pkl_path: str | None = None
     overlay_path: str | None = None
     bvh_path: str | None = None
@@ -68,6 +69,7 @@ class TaskState:
             "total_frames": self.total_frames,
             "start_frame": self.start_frame,
             "end_frame": self.end_frame,
+            "frame_step": self.frame_step,
             "error": self.error,
             "created_at": self.created_at.isoformat(),
         }
@@ -80,6 +82,7 @@ class TaskState:
             video_path=d.get("video_path"),
             start_frame=d.get("start_frame", 0),
             end_frame=d.get("end_frame", -1),
+            frame_step=d.get("frame_step", 1),
             pkl_path=d.get("pkl_path"),
             overlay_path=d.get("overlay_path"),
             bvh_path=d.get("bvh_path"),

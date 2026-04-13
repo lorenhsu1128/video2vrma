@@ -88,10 +88,14 @@ def run_phalp(
     output_dir: str | Path,
     start_frame: int = -1,
     end_frame: int = -1,
+    every_x_frame: int = 1,
 ) -> Path:
     video_path = Path(video_path).resolve()
     output_dir = Path(output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    from .vendor_paths import set_every_x_frame
+    set_every_x_frame(every_x_frame)
 
     _prepopulate_smpl_caches()
     phalp_demo = _load_phalp_demo()

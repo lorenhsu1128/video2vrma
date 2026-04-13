@@ -41,6 +41,7 @@ export type TracksResponse = {
   tracks: TrackInfo[];
   detection_fps: number;
   total_frames: number;
+  frame_step: number;
 };
 
 export type ConvertRequest = {
@@ -67,11 +68,13 @@ export async function uploadVideo(
   file: File,
   startTime?: number,
   endTime?: number,
+  frameStep?: number,
 ): Promise<{ task_id: string; share_token: string }> {
   const fd = new FormData();
   fd.append("file", file);
   if (startTime != null && startTime > 0) fd.append("start_time", String(startTime));
   if (endTime != null && endTime > 0) fd.append("end_time", String(endTime));
+  if (frameStep != null && frameStep > 1) fd.append("frame_step", String(frameStep));
   const res = await fetch(`${API_BASE}/api/upload`, {
     method: "POST",
     body: fd,

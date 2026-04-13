@@ -13,8 +13,8 @@ class StubPipeline:
         self.detect_calls: list = []
         self.convert_calls: list = []
 
-    def step1_detect(self, video_path, output_dir, start_frame=0, end_frame=-1):
-        self.detect_calls.append((str(video_path), str(output_dir)))
+    def step1_detect(self, video_path, output_dir, start_frame=0, end_frame=-1, frame_step=1):
+        self.detect_calls.append((str(video_path), str(output_dir), int(frame_step)))
         out_dir = Path(output_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
         pkl = out_dir / "fake.pkl"
@@ -317,3 +317,27 @@ def test_client_id_auto_generated_when_missing(client_and_stub, tmp_path):
     tm = client.app.state.task_manager
     task = tm.get(task_id)
     assert task.client_id  # auto-generated, non-empty
+
+
+def test_frame_step_parameter(client_and_stub, tmp_path):
+    client, stub = client_and_stub
+    fake_mp4 = tmp_path / "step.mp4"
+    fake_mp4.write_bytes(b"\x00\x00\x00\x18ftypmp42")
+    with fake_mp4.open("rb") as f:
+        r = client.post(
+            "/api/upload",
+            files={"file": ("step.mp4", f, "video/mp4")},
+            data={"frame_step": "5"},
+            headers={"X-Client-Id": "tester"},
+        )
+    assert r.status_code == 200
+    task_id = r.json()["task_id"]
+
+    tm = client.app.state.task_manager
+    assert tm.get(task_id).frame_step == 5
+
+    _wait_for(client, task_id, "tracks_ready")
+    assert stub.detect_calls[-1][2] == 5  # frame_step passed to pipeline
+
+    r = client.get(f"/api/tasks/{task_id}/tracks")
+    assert r.json()["frame_step"] == 5

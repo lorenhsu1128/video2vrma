@@ -14,14 +14,19 @@ def step1_detect(
     output_dir: str | Path,
     start_frame: int = 0,
     end_frame: int = DEFAULT_END_FRAME,
+    frame_step: int = 1,
 ) -> dict:
-    """跑 PHALP，回傳 {pkl, tracks}。overlay 由 gpu_worker 另外呼叫。"""
+    """跑 PHALP，回傳 {pkl, tracks, total_frames, frame_step}。overlay 由 gpu_worker 另外呼叫。"""
     video_path = Path(video_path).resolve()
     output_dir = Path(output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
-    pkl_path = run_phalp(video_path, output_dir / "phalp", start_frame=start_frame, end_frame=end_frame)
+    pkl_path = run_phalp(
+        video_path, output_dir / "phalp",
+        start_frame=start_frame, end_frame=end_frame,
+        every_x_frame=frame_step,
+    )
     tracks, total_frames = list_tracks_meta(pkl_path)
-    return {"pkl": pkl_path, "tracks": tracks, "total_frames": total_frames}
+    return {"pkl": pkl_path, "tracks": tracks, "total_frames": total_frames, "frame_step": frame_step}
 
 
 def step1b_overlay(pkl_path: str | Path, output_dir: str | Path, fps: float = DEFAULT_FPS) -> Path:

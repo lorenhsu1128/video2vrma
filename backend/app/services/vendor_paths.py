@@ -127,3 +127,31 @@ _stub_pyrender()
 _stub_phalp_renderer()
 _stub_neural_renderer()
 _patch_torch_load_weights_only()
+
+
+# --- every_x_frame monkey-patch ---
+# vendor/PHALP/phalp/utils/io.py:56 硬寫 every_x_frame=1。
+# 透過 patch FrameExtractor.extract_frames，讓它讀取 cfg 上的自訂欄位。
+_V2V_EVERY_X_FRAME: int = 1
+
+
+def set_every_x_frame(value: int) -> None:
+    global _V2V_EVERY_X_FRAME
+    _V2V_EVERY_X_FRAME = max(1, value)
+
+
+def _patch_frame_extractor() -> None:
+    from phalp.utils.utils import FrameExtractor
+
+    if getattr(FrameExtractor.extract_frames, "_v2v_patched", False):
+        return
+    _orig = FrameExtractor.extract_frames
+
+    def _patched(self, every_x_frame=1, **kwargs):
+        return _orig(self, every_x_frame=_V2V_EVERY_X_FRAME, **kwargs)
+
+    _patched._v2v_patched = True  # type: ignore[attr-defined]
+    FrameExtractor.extract_frames = _patched
+
+
+_patch_frame_extractor()

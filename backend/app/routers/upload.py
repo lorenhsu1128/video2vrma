@@ -28,6 +28,7 @@ async def upload(
     file: UploadFile = File(...),
     start_time: Optional[float] = Form(None),
     end_time: Optional[float] = Form(None),
+    frame_step: Optional[int] = Form(None),
     x_client_id: str = Header(""),
 ) -> UploadResponse:
     suffix = Path(file.filename or "").suffix.lower()
@@ -62,6 +63,7 @@ async def upload(
 
     task.start_frame = start_frame
     task.end_frame = end_frame
+    task.frame_step = max(1, frame_step or 1)
 
     task_manager.save_history(task_id)
     await task_manager.enqueue(task_id)
