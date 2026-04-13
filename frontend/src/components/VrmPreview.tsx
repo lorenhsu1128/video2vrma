@@ -96,6 +96,10 @@ export const VrmPreview = forwardRef<VrmPreviewHandle, Props>(function VrmPrevie
       const mixer = _ensureMixer();
       if (!mixer) return;
       playingRef.current = false;
+      const clip = clipRef.current!;
+      const action = mixer.clipAction(clip);
+      action.reset();
+      action.play();
       mixer.setTime(Math.max(0, t));
     },
   }));
