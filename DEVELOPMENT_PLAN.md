@@ -32,7 +32,7 @@
 | BVH→VRMA | 前端瀏覽器內執行，參考 vendor/bvh2vrma 的轉換邏輯 |
 | 後端框架 | FastAPI (Python) |
 | 任務佇列 | 內建 asyncio.Queue + ThreadPoolExecutor (無外部依賴) |
-| 任務狀態 | 記憶體內 dict (無外部依賴) |
+| 任務狀態 | 記憶體內 dict + per-task JSON 持久化（7 天保留） |
 | GPU 推理 | PHALP / 4D Humans (PyTorch + CUDA) |
 | SMPL→BVH | smpl2bvh (Python) |
 | 動作平滑 | scipy.signal (Savitzky-Golay filter) |
@@ -313,7 +313,8 @@ video2vrma/
 │   │   ├── config.py                  # 路徑常數 + 預設參數
 │   │   ├── routers/
 │   │   │   ├── upload.py              # POST /api/upload
-│   │   │   ├── tasks.py              # GET status/tracks/download + POST convert + WS
+│   │   │   ├── tasks.py              # GET status/tracks/download + POST convert + DELETE + WS
+│   │   │   ├── history.py            # GET /api/history + GET /api/r/{share_token}
 │   │   │   └── system.py             # GET /api/system/stats
 │   │   ├── services/
 │   │   │   ├── vendor_paths.py       # env override + stub/patch
@@ -337,6 +338,7 @@ video2vrma/
 │   ├── src/
 │   │   ├── app/
 │   │   │   ├── page.tsx              # 完整流程頁
+│   │   │   ├── r/[token]/page.tsx    # 公開分享頁（唯讀）
 │   │   │   └── layout.tsx
 │   │   ├── components/
 │   │   │   ├── VideoUploader.tsx      # multipart 上傳
@@ -346,19 +348,25 @@ video2vrma/
 │   │   │   ├── ConversionPanel.tsx    # fps + smoothing + 轉換
 │   │   │   ├── VrmPreview.tsx         # three + @pixiv/three-vrm 預覽
 │   │   │   ├── ReviewPanel.tsx        # 三欄同步預覽（原始 / overlay / VRM）+ 裁切 loop
-│   │   │   └── SystemStats.tsx        # CPU / GPU / 佇列監控
+│   │   │   ├── SystemStats.tsx        # CPU / GPU / 佇列監控
+│   │   │   └── HistoryPanel.tsx      # 轉換歷史記錄列表
 │   │   ├── services/
 │   │   │   ├── apiClient.ts           # fetch wrapper
 │   │   │   └── bvhToVrma.ts          # bvhText → vrma blob
 │   │   ├── hooks/
 │   │   │   └── useTaskProgress.ts    # WebSocket 訂閱
-│   │   └── lib/bvh2vrma/             # vendor copy（5 檔）
+│   │   ├── lib/
+│   │   │   ├── bvh2vrma/             # vendor copy（5 檔）
+│   │   │   └── clientId.ts           # localStorage client UUID
 │   ├── public/models/default.vrm     # 預設 VRM 模型
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── next.config.js
 │
 └── tmp/                               # 暫存（不進 git）
+    ├── uploads/                       # 上傳的影片
+    ├── tasks/                         # 各任務的 pkl / overlay / bvh
+    └── history/                       # per-task JSON 持久化（7 天保留）
 ```
 
 ---
@@ -369,13 +377,16 @@ video2vrma/
 
 | 端點 | 方法 | 功能 | 請求/回應 |
 |------|------|------|-----------|
-| `/api/upload` | POST | 上傳 MP4 | multipart/form-data → `{ task_id }` |
+| `/api/upload` | POST | 上傳 MP4 | multipart/form-data + `X-Client-Id` header → `{ task_id, share_token }` |
 | `/api/tasks/{task_id}/status` | GET | 查詢任務狀態 | → `{ status, progress, step, message, error? }` |
-| `/api/tasks/{task_id}/tracks` | GET | 取得人物列表 | → `{ tracks: [{ track_id, frame_count }] }` |
+| `/api/tasks/{task_id}/tracks` | GET | 取得人物列表 | → `{ tracks: [{ track_id, frame_count, start_frame }], detection_fps, total_frames }` |
 | `/api/tasks/{task_id}/convert` | POST | 指定 track 轉 BVH | `{ track_id, fps?, smoothing? }` → `{ status }` |
 | `/api/tasks/{task_id}/download/bvh` | GET | 下載 BVH | → BVH 檔案 |
 | `/api/tasks/{task_id}/video` | GET | 串流原始影片 | → video/mp4 |
 | `/api/tasks/{task_id}/overlay` | GET | 串流骨架 overlay 影片 | → video/mp4（多 track 彩色標註 + ID 標籤） |
+| `/api/tasks/{task_id}` | DELETE | 刪除自己的任務 | `X-Client-Id` header → `{ deleted }` |
+| `/api/history` | GET | 列出使用者的轉換記錄 | `X-Client-Id` header → `[{ task_id, share_token, file_name, status, created_at, has_bvh, has_overlay, error? }]` |
+| `/api/r/{share_token}` | GET | 公開短連結查詢 | → `{ task_id, file_name, status, created_at, has_bvh, has_overlay, has_video, tracks?, detection_fps?, total_frames? }` |
 | `/api/system/stats` | GET | 系統狀態 | → `{ cpu_pct, gpu_name, gpu_util_pct, gpu_mem_*, tasks_* }` |
 
 ### WebSocket
@@ -743,6 +754,105 @@ video2vrma/
 
 ---
 
+### Phase 7：轉換歷史記錄與分享
+
+**目標：** 使用者無需登入即可自動保留轉換記錄（7 天），可重新檢視、下載、分享或刪除。
+
+**設計決策：**
+
+- 使用者識別：前端 `localStorage` 存 UUID (`clientId`)，每次請求帶 `X-Client-Id` header
+- 持久化：每個 task 一個 JSON 檔（`tmp/history/{task_id}.json`），啟動時載入
+- 分享：每個 task 產生 12 字元 `share_token`，公開短連結 `/r/{share_token}`
+- 保留期限：7 天，自動清理 JSON + 影片 + pkl + overlay + BVH
+- 安全性：刪除操作需 `clientId` 匹配；`share_token` 獨立於 `clientId`（不洩漏身份）
+
+**JSON 持久化格式（`tmp/history/{task_id}.json`）：**
+
+```json
+{
+  "task_id": "a1b2c3d4",
+  "client_id": "uuid-from-header",
+  "share_token": "abcdef123456",
+  "file_name": "dance.mp4",
+  "status": "bvh_ready",
+  "video_path": "tmp/uploads/a1b2c3d4.mp4",
+  "overlay_path": "tmp/tasks/a1b2c3d4/overlay.mp4",
+  "bvh_path": "tmp/tasks/a1b2c3d4/out.bvh",
+  "pkl_path": "tmp/tasks/a1b2c3d4/phalp/results/demo_....pkl",
+  "native_fps": 30.0,
+  "tracks": [{"track_id": 0, "frame_count": 120, "start_frame": 0}],
+  "total_frames": 120,
+  "start_frame": 0,
+  "end_frame": -1,
+  "error": null,
+  "created_at": "2026-04-13T10:30:00"
+}
+```
+
+寫入時機（僅在穩定狀態，不在高頻 progress 更新時）：
+
+```
+upload  → QUEUED       → save ✓
+detect  → TRACKS_READY → save ✓
+convert → BVH_READY    → save ✓
+error   → ERROR        → save ✓
+```
+
+**Phase 7a：後端持久化基礎**
+
+- [ ] 7a.1 `task_manager.py`：TaskState 新增 `client_id: str`、`share_token: str`、`file_name: str` 欄位
+- [ ] 7a.2 `task_manager.py`：新增 `to_persist_dict()` 方法（序列化結果欄位，排除暫態 progress/message）
+- [ ] 7a.3 `task_manager.py`：新增 `@classmethod from_persist_dict()` 方法（從 JSON 重建 TaskState）
+- [ ] 7a.4 `task_manager.py`：新增 `history_dir: Path` 參數，`save_history(task_id)` 方法（atomic write：寫 .tmp → rename）
+- [ ] 7a.5 `task_manager.py`：新增 `_share_index: dict[str, str]`（share_token → task_id），`get_by_share_token()` 方法
+- [ ] 7a.6 `task_manager.py`：新增 `load_history()` 方法（啟動時掃描 `history_dir/*.json`，跳過 >7 天或檔案遺失的）
+- [ ] 7a.7 `task_manager.py`：新增 `delete_task(task_id)` 方法（刪記憶體 + 所有檔案 + work dir + JSON + share_index）
+- [ ] 7a.8 `task_manager.py`：`cleanup_old_tasks` 改 7 天（`max_age_hours=168`），加刪 JSON + work dir + share_index
+- [ ] 7a.9 `main.py`：建立 `history_dir = TMP / "history"`，傳給 TaskManager，啟動時呼叫 `load_history()`
+- [ ] 7a.10 `upload.py`：讀 `X-Client-Id` header，設定 `task.client_id` / `share_token` / `file_name`，呼叫 `save_history()`
+- [ ] 7a.11 `upload.py`：`UploadResponse` 加 `share_token: str`
+- [ ] 7a.12 `gpu_worker.py`：detect 完成（TRACKS_READY）、convert 完成（BVH_READY）、error 時呼叫 `save_history()`
+- [ ] 7a.13 `schemas.py`：新增 `HistoryItem`、`SharedTaskResponse` 模型，更新 `UploadResponse`
+- [ ] 7a.14 `tests/test_api.py`：更新 stub + 新增持久化相關測試
+
+**驗收：** `pytest tests/ -x` 全過，curl `POST /api/upload` 回傳 `share_token`，重啟後端後 task 仍存在
+
+**Phase 7b：後端 API 端點**
+
+- [ ] 7b.1 新建 `routers/history.py`：`GET /api/history`（依 `X-Client-Id` 篩選，按時間倒序）
+- [ ] 7b.2 `routers/history.py`：`GET /api/r/{share_token}`（公開，回傳 task 資訊 + 下載連結，404 若已刪除）
+- [ ] 7b.3 `routers/tasks.py`：`DELETE /api/tasks/{task_id}`（驗證 `X-Client-Id` 匹配，403 若非本人）
+- [ ] 7b.4 `main.py`：註冊 history router（`app.include_router(history_router, prefix="/api")`）
+
+**驗收：** curl 可打 `GET /api/history`、`GET /api/r/{token}`、`DELETE /api/tasks/{id}`
+
+**Phase 7c：前端 Client ID 與 API 整合**
+
+- [ ] 7c.1 新建 `lib/clientId.ts`：`getClientId()` → `crypto.randomUUID()` + `localStorage`
+- [ ] 7c.2 `apiClient.ts`：`clientHeaders()` helper，所有 fetch 呼叫加 `X-Client-Id` header
+- [ ] 7c.3 `apiClient.ts`：新增 `getHistory()`、`getSharedTask(token)`、`deleteTask(taskId)` 函式與型別
+- [ ] 7c.4 `apiClient.ts`：更新 `uploadVideo` 回傳型別加 `share_token`
+
+**驗收：** `tsc --noEmit` 通過，現有功能不受影響
+
+**Phase 7d：前端歷史記錄 UI**
+
+- [ ] 7d.1 新建 `components/HistoryPanel.tsx`：列表顯示檔名、狀態標籤、相對時間、載入 / 分享 / 刪除按鈕
+- [ ] 7d.2 `page.tsx`：新增 `onLoadTask(taskId, fileName)` 回調（fetch status → tracks → BVH → 恢復狀態）
+- [ ] 7d.3 `page.tsx`：整合 HistoryPanel（`<details>` 摺疊區塊，放在上傳區上方）
+- [ ] 7d.4 `page.tsx`：上傳後儲存 `shareToken` state，顯示可複製的分享連結
+
+**驗收：** 開瀏覽器 → 歷史列表可展開、載入舊任務可檢視/下載、刪除有確認對話框、分享連結可複製
+
+**Phase 7e：分享頁面**
+
+- [ ] 7e.1 新建 `app/r/[token]/page.tsx`：唯讀檢視 + 下載按鈕（BVH / VRMA）
+- [ ] 7e.2 分享頁可選顯示影片 / overlay / VRM 預覽（複用現有元件）
+
+**驗收：** 開啟 `http://localhost:3000/r/{token}` 可看到任務資訊與下載按鈕
+
+---
+
 ## CLAUDE.md 概要
 
 > 實際 CLAUDE.md 在專案根目錄，以下為概要摘錄。
@@ -753,7 +863,7 @@ video2vrma/
 - vendor/ 只讀，客製化在 services 層
 - GPU 一次只處理一個任務（ThreadPoolExecutor max_workers=1）
 - BVH → VRMA 在前端瀏覽器中執行
-- 服務重啟時任務狀態遺失（記憶體內）
+- 任務持久化：per-task JSON（`tmp/history/`），啟動時載入，7 天自動清理
 
 ---
 
@@ -769,4 +879,4 @@ video2vrma/
 | 旋轉平滑 gimbal lock | 動畫異常 | quaternion slerp 替代 |
 | three-vrm 套件版本衝突 | 執行錯誤 | 與 vendor/bvh2vrma 用同版本 |
 | SMPL 學術授權 | 無法商用 | 聯繫 Meshcapade |
-| 重啟遺失任務 | 體驗問題 | 可接受；未來可加 SQLite |
+| 重啟遺失任務 | 體驗問題 | Phase 7 以 per-task JSON 持久化解決（7 天保留） |
