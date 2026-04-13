@@ -140,7 +140,7 @@ export function ReviewPanel({ videoUrl, overlayUrl, vrmaBlob, vrmUrl, trim, clip
         v.play();
       }
       overlayRef.current?.play();
-      // VRM 由 tick loop 的 setTime 精確同步，不需 play()
+      vrmRef.current?.play();
     } else {
       videoRef.current?.play();
       overlayRef.current?.play();
@@ -169,8 +169,7 @@ export function ReviewPanel({ videoUrl, overlayUrl, vrmaBlob, vrmUrl, trim, clip
         overlayRef.current.pause();
         overlayRef.current.currentTime = 0;
       }
-      // 重置 VRM 到 track 起始前（setTime 內部會 clamp 到 0）
-      vrmRef.current?.setTime(-trackOffsetTime);
+      vrmRef.current?.reset();
     }
     setPlaying(false);
   }, [isTrimming, isClipping, isSyncWithClip, startTime, clipStart, trackOffsetTime]);
