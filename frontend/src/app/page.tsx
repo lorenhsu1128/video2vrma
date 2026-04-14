@@ -360,7 +360,7 @@ export default function Home() {
 
       {tracks && tracks.length > 0 && (
         <section style={{ marginBottom: 16, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <ConversionPanel disabled={!canConvert} defaultFps={Math.round(detectionFps / currentFrameStep)} onConvert={onConvert} />
+          <ConversionPanel disabled={!canConvert} defaultFps={Math.round(detectionFps)} onConvert={onConvert} />
           {vrmaBlob && convertedTrackId != null && selectedTrack !== convertedTrackId && (
             <span style={{ fontSize: "0.82em", color: "#c80", background: "#fff7e0", padding: "4px 10px", borderRadius: 4, border: "1px solid #e0b050" }}>
               ⚠ VRM 仍是 Track {convertedTrackId} 的內容，請重新轉換以套用 Track {selectedTrack}

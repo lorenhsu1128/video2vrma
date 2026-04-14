@@ -36,7 +36,7 @@ async def get_tracks(request: Request, task_id: str) -> TracksResponse:
     return TracksResponse(
         task_id=task_id,
         tracks=[TrackInfo(**t) for t in task.tracks],
-        detection_fps=int(round(task.native_fps)),
+        detection_fps=int(round(task.native_fps / max(1, task.frame_step))),
         total_frames=task.total_frames,
         frame_step=task.frame_step,
     )

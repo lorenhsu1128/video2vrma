@@ -65,7 +65,7 @@ async def get_shared_task(
         has_overlay=bool(task.overlay_path and Path(task.overlay_path).exists()),
         has_video=bool(task.video_path and Path(task.video_path).exists()),
         tracks=tracks,
-        detection_fps=int(round(task.native_fps)) if task.tracks else None,
+        detection_fps=int(round(task.native_fps / max(1, task.frame_step))) if task.tracks else None,
         total_frames=task.total_frames if task.tracks else None,
         detect_elapsed_sec=_elapsed(task.detect_started_at, task.detect_finished_at),
         convert_elapsed_sec=_elapsed(task.convert_started_at, task.convert_finished_at),

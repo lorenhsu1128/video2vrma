@@ -441,3 +441,6 @@ def test_frame_step_parameter(client_and_stub, tmp_path):
 
     r = client.get(f"/api/tasks/{task_id}/tracks")
     assert r.json()["frame_step"] == 5
+    # detection_fps 應該是 effective fps（native_fps / frame_step），
+    # 不是原始影片 fps。stub mp4 無 header，_probe_fps 預設 30 → 30/5 = 6。
+    assert r.json()["detection_fps"] == 6
