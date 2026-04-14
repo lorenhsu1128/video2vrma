@@ -1,7 +1,33 @@
+import time
 from pathlib import Path
+from typing import Callable
 
 import joblib
 import numpy as np
+
+
+def _throttled(
+    cb: Callable[[float], None] | None,
+    min_delta: float = 0.02,
+    min_interval: float = 0.3,
+) -> Callable[[float], None]:
+    """包裝 progress callback：進度增加 ≥ min_delta 或距上次 ≥ min_interval 才推。"""
+    if cb is None:
+        return lambda _p: None
+    state = {"last_p": -1.0, "last_t": 0.0}
+
+    def wrapped(p: float) -> None:
+        now = time.monotonic()
+        if (
+            p >= 1.0
+            or p - state["last_p"] >= min_delta
+            or now - state["last_t"] >= min_interval
+        ):
+            state["last_p"] = p
+            state["last_t"] = now
+            cb(p)
+
+    return wrapped
 
 from . import vendor_paths  # noqa: F401
 from .smpl_to_bvh_service import _ensure_smpl_layout
@@ -125,6 +151,7 @@ def render_overlay_video(
     pkl_path: str | Path,
     output_mp4: str | Path,
     fps: float = 30,
+    progress_cb: Callable[[float], None] | None = None,
 ) -> Path:
     import cv2
 
@@ -132,6 +159,8 @@ def render_overlay_video(
     frame_keys = sorted(data.keys())
     if not frame_keys:
         raise RuntimeError("empty PHALP pkl")
+
+    throttled = _throttled(progress_cb)
 
     tid_counts: dict[int, int] = {}
     for fk in frame_keys:
@@ -153,7 +182,8 @@ def render_overlay_video(
     if not writer.isOpened():
         raise RuntimeError(f"cv2.VideoWriter could not open {output_mp4}")
 
-    for fk in frame_keys:
+    n_frames = len(frame_keys)
+    for i, fk in enumerate(frame_keys):
         f = data[fk]
         img_path = Path(f["frame_path"].replace("\\", "/"))
         img = cv2.imread(str(img_path))
@@ -189,6 +219,7 @@ def render_overlay_video(
             cv2.putText(img, label, (tx, ty), font, scale, color, thickness, cv2.LINE_AA)
 
         writer.write(img)
+        throttled((i + 1) / n_frames)
 
     writer.release()
     if not output_mp4.exists() or output_mp4.stat().st_size == 0:

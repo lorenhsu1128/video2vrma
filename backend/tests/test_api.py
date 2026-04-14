@@ -13,8 +13,11 @@ class StubPipeline:
         self.detect_calls: list = []
         self.convert_calls: list = []
 
-    def step1_detect(self, video_path, output_dir, start_frame=0, end_frame=-1, frame_step=1):
+    def step1_detect(self, video_path, output_dir, start_frame=0, end_frame=-1, frame_step=1, progress_cb=None):
         self.detect_calls.append((str(video_path), str(output_dir), int(frame_step)))
+        if progress_cb:
+            progress_cb(0.5)
+            progress_cb(1.0)
         out_dir = Path(output_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
         pkl = out_dir / "fake.pkl"
@@ -28,11 +31,13 @@ class StubPipeline:
             "total_frames": 130,
         }
 
-    def step1b_overlay(self, pkl_path, output_dir, fps=30):
+    def step1b_overlay(self, pkl_path, output_dir, fps=30, progress_cb=None):
         out_dir = Path(output_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
         overlay = out_dir / "overlay.mp4"
         overlay.write_bytes(b"fake overlay mp4")
+        if progress_cb:
+            progress_cb(1.0)
         return overlay
 
     def step2_convert(self, pkl_path, output_bvh, track_id, fps=30, smoothing=False):
@@ -366,6 +371,24 @@ def test_upload_persists_clip_times(client_and_stub, tmp_path):
     body = r.json()
     assert body["clip_start_time"] == 1.5
     assert body["clip_end_time"] == 3.5
+
+
+def test_throttled_progress_callback():
+    from app.services.preview import _throttled
+
+    calls: list[float] = []
+    cb = _throttled(lambda p: calls.append(p), min_delta=0.1, min_interval=10.0)
+    # 0.0 first pass, 0.05 < 0.1 delta skipped, 0.11 passes, 0.15 skipped, 1.0 forced
+    cb(0.0)
+    cb(0.05)
+    cb(0.11)
+    cb(0.15)
+    cb(1.0)
+    assert calls[0] == 0.0
+    assert 0.11 in calls
+    assert calls[-1] == 1.0
+    assert 0.05 not in calls
+    assert 0.15 not in calls
 
 
 def test_frame_step_parameter(client_and_stub, tmp_path):

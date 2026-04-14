@@ -7,6 +7,24 @@ from typing import Callable
 
 from .task_manager import TaskManager, TaskStep
 
+
+def _make_progress_bridge(
+    loop: asyncio.AbstractEventLoop,
+    task_manager: TaskManager,
+    task_id: str,
+    step: TaskStep,
+    message: str = "",
+) -> Callable[[float], None]:
+    """把 sync 世界的 progress_cb 橋接到 async update_progress。"""
+    def cb(p: float) -> None:
+        mapped = max(0.0, min(1.0, p))
+        asyncio.run_coroutine_threadsafe(
+            task_manager.update_progress(task_id, step, mapped, message),
+            loop,
+        )
+
+    return cb
+
 log = logging.getLogger(__name__)
 
 
@@ -65,6 +83,9 @@ class GPUWorker:
         )
         loop = asyncio.get_running_loop()
         out_dir = self.work_dir / task_id
+        detect_cb = _make_progress_bridge(
+            loop, self.task_manager, task_id, TaskStep.DETECTING, "PHALP 偵測中…"
+        )
         result = await loop.run_in_executor(
             self.executor,
             lambda: self.pipeline.step1_detect(
@@ -72,6 +93,7 @@ class GPUWorker:
                 start_frame=task.start_frame,
                 end_frame=task.end_frame,
                 frame_step=task.frame_step,
+                progress_cb=detect_cb,
             ),
         )
         task.pkl_path = str(result["pkl"])
@@ -79,13 +101,18 @@ class GPUWorker:
         task.total_frames = result.get("total_frames", 0)
 
         await self.task_manager.update_progress(
-            task_id, TaskStep.RENDERING_OVERLAY, 0.5, "骨架 overlay 影片產生中…"
+            task_id, TaskStep.RENDERING_OVERLAY, 0.0, "骨架 overlay 影片產生中…"
         )
         if hasattr(self.pipeline, "step1b_overlay"):
+            overlay_cb = _make_progress_bridge(
+                loop, self.task_manager, task_id, TaskStep.RENDERING_OVERLAY,
+                "骨架 overlay 影片產生中…",
+            )
             overlay = await loop.run_in_executor(
                 self.executor,
                 lambda: self.pipeline.step1b_overlay(
                     task.pkl_path, out_dir, fps=task.native_fps / task.frame_step,
+                    progress_cb=overlay_cb,
                 ),
             )
             task.overlay_path = str(overlay)

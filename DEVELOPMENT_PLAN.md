@@ -1013,14 +1013,14 @@ interpolation.py: axis-angle → quaternion → SLERP 補幀 → axis-angle
 
 **Phase 10c：Detect / Overlay 真實進度**
 
-- [ ] 10c.1 `preview.py`：`render_overlay_video` 新增 `progress_cb` 參數，for 迴圈每幀 `(i+1)/len(frame_keys)` 經 throttle 後呼叫
-- [ ] 10c.2 `preview.py`：新增 `_throttled(cb, min_delta=0.02, min_interval=0.3)` 工具（2% 或 300ms 才推）
-- [ ] 10c.3 `phalp_service.py`：新增 `_patch_tqdm_progress(cb)` context manager，proxy `tqdm.auto.tqdm.update` 抓 `n/total`
-- [ ] 10c.4 `phalp_service.py`：`run_phalp` 新增 `progress_cb` 參數，包住 `_cached_tracker.track()`
-- [ ] 10c.5 `pipeline.py`：`step1_detect` / `step1b_overlay` 透傳 `progress_cb`
-- [ ] 10c.6 `gpu_worker.py`：新增 `_make_progress_bridge(task_id, step, base, span)` helper 用 `asyncio.run_coroutine_threadsafe` 橋接 sync→async
-- [ ] 10c.7 `gpu_worker.py`：`_process_detect` 分別為 DETECTING / RENDERING_OVERLAY 建立 bridge，移除硬編 0.0 / 0.5 跳點
-- [ ] 10c.8 `tests/test_api.py`：`StubPipeline.step1_detect` / `step1b_overlay` 接受並忽略 `progress_cb=...` kwarg
+- [x] 10c.1 `preview.py`：`render_overlay_video` 新增 `progress_cb` 參數，for 迴圈每幀 `(i+1)/len(frame_keys)` 經 throttle 後呼叫
+- [x] 10c.2 `preview.py`：新增 `_throttled(cb, min_delta=0.02, min_interval=0.3)` 工具（2% 或 300ms 才推）
+- [x] 10c.3 `phalp_service.py`：新增 `_patch_tqdm_progress(cb)` context manager，proxy `tqdm.auto.tqdm.update` 抓 `n/total`
+- [x] 10c.4 `phalp_service.py`：`run_phalp` 新增 `progress_cb` 參數，包住 `_cached_tracker.track()`
+- [x] 10c.5 `pipeline.py`：`step1_detect` / `step1b_overlay` 透傳 `progress_cb`
+- [x] 10c.6 `gpu_worker.py`：新增 `_make_progress_bridge(task_id, step, base, span)` helper 用 `asyncio.run_coroutine_threadsafe` 橋接 sync→async
+- [x] 10c.7 `gpu_worker.py`：`_process_detect` 分別為 DETECTING / RENDERING_OVERLAY 建立 bridge，移除硬編 0.0 / 0.5 跳點
+- [x] 10c.8 `tests/test_api.py`：`StubPipeline.step1_detect` / `step1b_overlay` 接受並忽略 `progress_cb=...` kwarg
 
 **驗收：** 上傳短影片 → ProgressDisplay 在 detect 與 overlay 階段皆顯示平滑遞增百分比；若 tqdm patch 對該 PHALP 版本失效，detect 仍維持 0→1 跳動（graceful degrade），overlay 必定有真實進度
 

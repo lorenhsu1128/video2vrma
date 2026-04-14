@@ -2,7 +2,9 @@ import importlib.util
 import logging
 import os
 import pickle
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Callable
 
 from . import vendor_paths  # noqa: F401  (side-effect: sys.path + HOME + stubs)
 
@@ -71,6 +73,41 @@ def _prepopulate_smpl_caches() -> None:
             _convert_py2_smpl_to_py3(src, target)
 
 
+@contextmanager
+def _patch_tqdm_progress(cb: Callable[[float], None] | None):
+    """在 with 區塊內 proxy tqdm.auto.tqdm，每次 update 用 n/total 回報給 cb。
+
+    PHALP vendor 內部以 tqdm.auto.tqdm 顯示每幀進度；若未來 vendor 升級改用
+    別的進度套件，此 patch 會悄悄失效（cb 不會被呼叫），但不會壞。
+    """
+    if cb is None:
+        yield
+        return
+    try:
+        import tqdm.auto as _ta
+    except Exception:
+        yield
+        return
+
+    orig = _ta.tqdm
+
+    class _Proxy(orig):  # type: ignore[misc, valid-type]
+        def update(self, n=1):
+            r = super().update(n)
+            try:
+                if self.total:
+                    cb(min(self.n / self.total, 1.0))
+            except Exception:
+                pass
+            return r
+
+    _ta.tqdm = _Proxy
+    try:
+        yield
+    finally:
+        _ta.tqdm = orig
+
+
 def resolve_phalp_frame_range(
     start_frame: int | None = None,
     end_frame: int | None = None,
@@ -86,6 +123,7 @@ def run_phalp(
     start_frame: int = -1,
     end_frame: int = -1,
     every_x_frame: int = 1,
+    progress_cb: Callable[[float], None] | None = None,
 ) -> Path:
     global _cached_tracker
 
@@ -134,7 +172,10 @@ def run_phalp(
         cfg.phalp.end_frame = -1
         cfg.overwrite = False
 
-    _cached_tracker.track()
+    from .preview import _throttled
+    throttled_cb = _throttled(progress_cb) if progress_cb else None
+    with _patch_tqdm_progress(throttled_cb):
+        _cached_tracker.track()
 
     video_seq = Path(video_path).stem
     pkl_path = output_dir / "results" / f"demo_{video_seq}.pkl"
