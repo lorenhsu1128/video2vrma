@@ -40,6 +40,7 @@ async def list_history(
             convert_elapsed_sec=_elapsed(t.convert_started_at, t.convert_finished_at),
             clip_start_time=t.clip_start_time,
             clip_end_time=t.clip_end_time,
+            converted_track_id=t.converted_track_id,
         )
         for t in items
     ]
@@ -70,4 +71,5 @@ async def get_shared_task(
         convert_elapsed_sec=_elapsed(task.convert_started_at, task.convert_finished_at),
         clip_start_time=task.clip_start_time,
         clip_end_time=task.clip_end_time,
+        converted_track_id=task.converted_track_id,
     )

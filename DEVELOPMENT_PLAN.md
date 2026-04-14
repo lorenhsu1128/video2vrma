@@ -1026,6 +1026,54 @@ interpolation.py: axis-angle → quaternion → SLERP 補幀 → axis-angle
 
 ---
 
+### Phase 11：VRM 同步播放總是有作用（多 track + reload 修復）
+
+**背景：**
+- **Bug 1**：多 track 時 VRM 同步失效。VRMA 只包含被選中 track 的 frames，overlay 覆蓋整段 clip；當 `track.startFrame > 0`，`vrmT = overlayT − trackOffsetTime` 在 track 視窗外會被 clamp 到 0 或 vrmaDuration，VRM 大部分時間凍結。
+- **Bug 2**：reload 已完成 task 後 VRM 失效。後端不記錄「轉換時用的是哪個 track」，reload 後 `selectedTrack` 落到 `tracks[0]`，可能跟 VRMA 實際內容不同 → `trackOffsetTime` 錯 → VRM 永遠對不上 overlay。
+
+**修復方向：**
+1. 後端持久化 `converted_track_id`
+2. reload 時還原 `selectedTrack = converted_track_id`
+3. `trackTiming` 改用「VRMA 實際對應的 track」（即 convertedTrackId），而非 `selectedTrack`（避免使用者切 track 但還沒 re-convert 的暫時錯位）
+4. 同步 loop 縮小到 VRM 可動範圍：`[clipStart + trackOffsetTime, clipStart + trackOffsetTime + vrmaDuration]`，三面板起訖對齊 VRMA 有效視窗，永不凍結
+5. 切換 track 重新轉換時，新 VRMA 載入 → loop 範圍自動重算，下個循環跳到新 track 視窗
+
+---
+
+**Phase 11a：後端持久化 `converted_track_id`**
+
+- [x] 11a.1 `task_manager.py`：TaskState 新增 `converted_track_id: int | None = None`，加入 `to_persist_dict` / `from_persist_dict`
+- [x] 11a.2 `gpu_worker.py`：`process_convert` 在 BVH_READY 之前設 `task.converted_track_id = track_id`
+- [x] 11a.3 `schemas.py`：`HistoryItem` / `SharedTaskResponse` 新增 `converted_track_id: int | None = None`
+- [x] 11a.4 `routers/history.py`：回傳 `converted_track_id`
+- [x] 11a.5 `tests/test_api.py`：驗證 convert 後 `converted_track_id` 等於請求的 `track_id`，reload 後仍在
+
+**驗收：** pytest 全通過；history API 與 shared API 都回傳 `converted_track_id`
+
+---
+
+**Phase 11b：前端 VRMA 中心 loop + reload 還原 track**
+
+- [ ] 11b.1 `apiClient.ts`：`HistoryItem` / `SharedTask` 型別加 `converted_track_id: number | null`
+- [ ] 11b.2 `HistoryPanel.tsx`：`LoadTaskPayload` 新增 `convertedTrackId: number | null`，`onLoadTask` 呼叫時帶入
+- [ ] 11b.3 `VrmPreview.tsx`：新增 `onReady?: (duration: number) => void` prop，在 VRMA clip 載入後呼叫（之後 clip 換新時也要呼叫）
+- [ ] 11b.4 `page.tsx`：新增 `convertedTrackId` state；upload 流程的 `onConvert` 成功後設為 `selectedTrack`；`onLoadTask` 設為 `payload.convertedTrackId`（若非 null），並將 `selectedTrack` 預設也設成它
+- [ ] 11b.5 `page.tsx`：`trackTiming` 改由 `convertedTrackId` 查 `tracks` 產生（而非 `selectedTrack`），讓 VRM 時間永遠對應到 VRMA 內容
+- [ ] 11b.6 `ReviewPanel.tsx`：新增 `vrmaDuration` state，透過傳下 `onVrmReady` 給 `VrmPreview` 的 `onReady` 更新
+- [ ] 11b.7 `ReviewPanel.tsx`：同步播放模式下，把 loop 範圍從 `[clipStart, clipEnd]` 改為 `[clipStart + trackOffsetTime, clipStart + trackOffsetTime + vrmaDuration]`；對應 overlay loop 為 `[trackOffsetTime, trackOffsetTime + vrmaDuration]`
+- [ ] 11b.8 `ReviewPanel.tsx`：`onVideoLoaded`、`syncPlay`、`syncReset`、tick loop 的邊界判斷全部用新的 loopStart/loopEnd；初始化 `v.currentTime = loopStart` 而非 clipStart
+- [ ] 11b.9 `ReviewPanel.tsx`：當 `vrmaBlob` 切換（re-convert 完成）→ useEffect 偵測 `vrmaDuration` 變更 → 若正在播放且 `v.currentTime` 超出新 loop，seek 回新 loopStart
+- [ ] 11b.10 `ReviewPanel.tsx`：PlaybackBar 的 `duration` / `currentTime` 改用 loop 範圍（`loopEnd - loopStart`、`videoCurrentTime - loopStart`），讓拖拉也限制在 VRM 有效視窗內
+
+**驗收：**
+- 多 track 影片選任一 track 轉換 → 按同步播放 → 三面板在 VRM 有效視窗內同步、VRM 全程都在動、沒有凍結
+- 切換 track 重新轉換 → 新 VRMA 載入後 → 下個循環自動跳到新 track 視窗
+- 從 history load 任意已完成 task → selectedTrack 自動設為原轉換 track → 同步播放 VRM 正常動作
+- Phase 9c 測試仍通過（upload、download、share、delete）
+
+---
+
 ## CLAUDE.md 概要
 
 > 實際 CLAUDE.md 在專案根目錄，以下為概要摘錄。

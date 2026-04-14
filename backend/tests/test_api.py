@@ -373,6 +373,34 @@ def test_upload_persists_clip_times(client_and_stub, tmp_path):
     assert body["clip_end_time"] == 3.5
 
 
+def test_converted_track_id_persisted(client_and_stub, tmp_path):
+    client, _ = client_and_stub
+    data = _upload(client, tmp_path, client_id="track-user")
+    task_id = data["task_id"]
+    share_token = data["share_token"]
+    _wait_for(client, task_id, "tracks_ready")
+
+    # before convert: converted_track_id is None
+    r = client.get("/api/history", headers={"X-Client-Id": "track-user"})
+    assert r.json()[0]["converted_track_id"] is None
+
+    # convert track 2
+    r = client.post(f"/api/tasks/{task_id}/convert", json={"track_id": 2, "fps": 30, "smoothing": False})
+    assert r.status_code == 200
+
+    # history should record track_id=2
+    r = client.get("/api/history", headers={"X-Client-Id": "track-user"})
+    assert r.json()[0]["converted_track_id"] == 2
+
+    # shared endpoint too
+    r = client.get(f"/api/r/{share_token}")
+    assert r.json()["converted_track_id"] == 2
+
+    # persisted on disk
+    record = json.loads((tmp_path / "history" / f"{task_id}.json").read_text(encoding="utf-8"))
+    assert record["converted_track_id"] == 2
+
+
 def test_throttled_progress_callback():
     from app.services.preview import _throttled
 

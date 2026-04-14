@@ -52,6 +52,7 @@ class HistoryItem(BaseModel):
     convert_elapsed_sec: float | None = None
     clip_start_time: float = 0.0
     clip_end_time: float = 0.0
+    converted_track_id: int | None = None
 
 
 class SharedTaskResponse(BaseModel):
@@ -69,3 +70,4 @@ class SharedTaskResponse(BaseModel):
     convert_elapsed_sec: float | None = None
     clip_start_time: float = 0.0
     clip_end_time: float = 0.0
+    converted_track_id: int | None = None

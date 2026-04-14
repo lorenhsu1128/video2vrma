@@ -166,6 +166,7 @@ class GPUWorker:
             raise
 
         task.bvh_path = str(bvh_path)
+        task.converted_track_id = track_id
         task.convert_finished_at = datetime.now()
         await self.task_manager.update_progress(
             task_id, TaskStep.BVH_READY, 1.0, "BVH 完成"

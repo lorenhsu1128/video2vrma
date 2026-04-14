@@ -49,6 +49,7 @@ class TaskState:
     convert_finished_at: datetime | None = None
     clip_start_time: float = 0.0
     clip_end_time: float = 0.0
+    converted_track_id: int | None = None
 
     def to_status_dict(self) -> dict[str, Any]:
         return {
@@ -84,6 +85,7 @@ class TaskState:
             "convert_finished_at": self.convert_finished_at.isoformat() if self.convert_finished_at else None,
             "clip_start_time": self.clip_start_time,
             "clip_end_time": self.clip_end_time,
+            "converted_track_id": self.converted_track_id,
         }
 
     @classmethod
@@ -116,6 +118,7 @@ class TaskState:
             convert_finished_at=_parse_dt("convert_finished_at"),
             clip_start_time=d.get("clip_start_time", 0.0),
             clip_end_time=d.get("clip_end_time", 0.0),
+            converted_track_id=d.get("converted_track_id"),
         )
 
 
