@@ -11,6 +11,7 @@
 - [0004](0004-sm120-wheel-compatibility.md) — RTX 5070 Ti sm_120 對預編 wheel 相容性有限（cuda, environment）
 - [0005](0005-vendor-import-side-effect-patches.md) — vendor/ 只讀時用 sys.modules stub + monkey-patch 繞過 import side-effect（vendor, architecture, windows）
 - [0006](0006-phalp-bvh-vrm-coordinate-pipeline.md) — PHALP→BVH→VRMA→VRM 跨階段座標系與 rig 陷阱（coordinate, three-vrm, bvh2vrma, phase2）
+- [0007](0007-phalp-first-frame-may-be-empty.md) — PHALP 第一幀可能完全沒偵測到人，用 `[0]` 索引前要掃找非空幀（phalp, preview, robustness）
 
 ## 規則摘要（取自所有 lessons）
 

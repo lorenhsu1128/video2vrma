@@ -169,8 +169,15 @@ def render_overlay_video(
     if not tid_counts:
         raise RuntimeError("no tracks in PHALP pkl")
 
-    first = data[frame_keys[0]]
-    img_h, img_w = first["size"][0]
+    # 找第一個有 size 資料的幀；PHALP 對無偵測的幀會給 size=[]
+    img_h = img_w = None
+    for fk in frame_keys:
+        size_list = data[fk].get("size") or []
+        if len(size_list) > 0:
+            img_h, img_w = size_list[0]
+            break
+    if img_h is None or img_w is None:
+        raise RuntimeError("PHALP pkl has no frame with size info")
     new_size = max(img_h, img_w)
     pad_x = (new_size - img_w) // 2
     pad_y = (new_size - img_h) // 2
