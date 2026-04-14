@@ -962,10 +962,10 @@ interpolation.py: axis-angle → quaternion → SLERP 補幀 → axis-angle
 
 新建精簡版 PlaybackBar 元件（薄型進度條 + 可點擊跳轉），放在 ReviewPanel 的影片和 overlay 面板下方。
 
-- [ ] 9b.1 新建 `components/PlaybackBar.tsx`：Props `duration`、`currentTime`、`onSeek?`，薄型橫條顯示已播放比例
-- [ ] 9b.2 `ReviewPanel.tsx`：新增 `overlayDuration`、`overlayCurrentTime` state，overlay 用 `onLoadedMetadata` 取 duration，tick loop 更新 currentTime
-- [ ] 9b.3 `ReviewPanel.tsx`：同步播放模式下影片面板加 `<PlaybackBar>`（duration = clipEnd-clipStart，currentTime = video.currentTime-clipStart）
-- [ ] 9b.4 `ReviewPanel.tsx`：overlay 面板加 `<PlaybackBar>`（duration = overlayDuration，currentTime = overlayCurrentTime）
+- [x] 9b.1 新建 `components/PlaybackBar.tsx`：Props `duration`、`currentTime`、`onSeek?`，薄型橫條顯示已播放比例
+- [x] 9b.2 `ReviewPanel.tsx`：新增 `overlayDuration`、`overlayCurrentTime` state，overlay 用 `onLoadedMetadata` 取 duration，tick loop 更新 currentTime
+- [x] 9b.3 `ReviewPanel.tsx`：同步播放模式下影片面板加 `<PlaybackBar>`（duration = clipEnd-clipStart，currentTime = video.currentTime-clipStart）
+- [x] 9b.4 `ReviewPanel.tsx`：overlay 面板加 `<PlaybackBar>`（duration = overlayDuration，currentTime = overlayCurrentTime）
 
 **驗收：** 同步播放時兩個 playhead 同步移動，可點擊跳轉
 

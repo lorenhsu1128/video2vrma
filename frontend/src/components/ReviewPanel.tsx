@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { PlaybackBar } from "./PlaybackBar";
 import { TrimSlider } from "./TrimSlider";
 import { VrmPreview, VrmPreviewHandle } from "./VrmPreview";
 
@@ -49,6 +50,8 @@ export function ReviewPanel({ videoUrl, overlayUrl, vrmaBlob, vrmUrl, trim, clip
   const [startTime, setStartTime] = useState(0);
   const [endTime, setEndTime] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
+  const [overlayDuration, setOverlayDuration] = useState(0);
+  const [overlayCurrentTime, setOverlayCurrentTime] = useState(0);
   const rafRef = useRef<number>(0);
 
   const localFile = trim?.file ?? clip?.file ?? null;
@@ -108,11 +111,14 @@ export function ReviewPanel({ videoUrl, overlayUrl, vrmaBlob, vrmUrl, trim, clip
           overlayRef.current?.play();
         }
       }
-      // 同步模式下每幀精確同步 VRM 時間（考慮 track offset）
-      if (isSyncWithClip && playing && overlayRef.current) {
+      // 同步模式下每幀精確同步 VRM 時間（考慮 track offset），並更新 overlay playhead
+      if (isSyncWithClip && overlayRef.current) {
         const overlayT = overlayRef.current.currentTime;
-        const vrmT = overlayT - trackOffsetTime;
-        vrmRef.current?.setTime(vrmT);
+        setOverlayCurrentTime(overlayT);
+        if (playing) {
+          const vrmT = overlayT - trackOffsetTime;
+          vrmRef.current?.setTime(vrmT);
+        }
       }
       rafRef.current = requestAnimationFrame(tick);
     };
@@ -206,6 +212,37 @@ export function ReviewPanel({ videoUrl, overlayUrl, vrmaBlob, vrmUrl, trim, clip
     }
   }, []);
 
+  const onOverlayLoaded = useCallback(() => {
+    const el = overlayRef.current;
+    if (!el) return;
+    setOverlayDuration(el.duration || 0);
+  }, []);
+
+  const onVideoSeek = useCallback(
+    (localT: number) => {
+      // localT 是 playhead 上的相對秒數（0 ~ clipEnd-clipStart）
+      const v = videoRef.current;
+      if (!v) return;
+      const absT = clipStart + localT;
+      v.currentTime = absT;
+      setCurrentTime(absT);
+    },
+    [clipStart],
+  );
+
+  const onOverlaySeek = useCallback(
+    (t: number) => {
+      const ov = overlayRef.current;
+      if (!ov) return;
+      ov.currentTime = t;
+      setOverlayCurrentTime(t);
+      if (isSyncWithClip) {
+        vrmRef.current?.setTime(t - trackOffsetTime);
+      }
+    },
+    [isSyncWithClip, trackOffsetTime],
+  );
+
   const segmentDuration = Math.max(0, endTime - startTime);
   const hasContent = activeVideoSrc || overlayUrl || vrmaBlob;
 
@@ -271,6 +308,13 @@ export function ReviewPanel({ videoUrl, overlayUrl, vrmaBlob, vrmUrl, trim, clip
                   onSeek={onSeek}
                 />
               )}
+              {isSyncWithClip && clipEnd > clipStart && (
+                <PlaybackBar
+                  duration={clipEnd - clipStart}
+                  currentTime={Math.max(0, currentTime - clipStart)}
+                  onSeek={onVideoSeek}
+                />
+              )}
             </>
           ) : (
             <div style={placeholderStyle}>等待選擇影片…</div>
@@ -280,14 +324,25 @@ export function ReviewPanel({ videoUrl, overlayUrl, vrmaBlob, vrmUrl, trim, clip
         <div style={panelStyle}>
           <div style={labelStyle}>骨架 Overlay</div>
           {overlayUrl ? (
-            <video
-              ref={overlayRef}
-              src={overlayUrl}
-              preload="auto"
-              playsInline
-              muted
-              style={mediaStyle}
-            />
+            <>
+              <video
+                ref={overlayRef}
+                src={overlayUrl}
+                onLoadedMetadata={onOverlayLoaded}
+                onTimeUpdate={(e) => setOverlayCurrentTime(e.currentTarget.currentTime)}
+                preload="auto"
+                playsInline
+                muted
+                style={mediaStyle}
+              />
+              {overlayDuration > 0 && (
+                <PlaybackBar
+                  duration={overlayDuration}
+                  currentTime={overlayCurrentTime}
+                  onSeek={onOverlaySeek}
+                />
+              )}
+            </>
           ) : (
             <div style={placeholderStyle}>等待偵測完成…</div>
           )}
