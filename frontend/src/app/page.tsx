@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ConversionPanel } from "@/components/ConversionPanel";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import { HistoryPanel, type LoadTaskPayload } from "@/components/HistoryPanel";
 import { ProgressDisplay } from "@/components/ProgressDisplay";
 import { ReviewPanel } from "@/components/ReviewPanel";
@@ -40,7 +41,17 @@ export default function Home() {
   const [currentFrameStep, setCurrentFrameStep] = useState(1);
   const [busy, setBusy] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
+  const [pageInfo, setPageInfo] = useState<string | null>(null);
   const [historyKey, setHistoryKey] = useState(0);
+
+  const reportError = useCallback((err: unknown) => {
+    const raw = err instanceof Error ? err.message : String(err);
+    const friendly =
+      raw.includes("Failed to fetch") || raw.includes("NetworkError")
+        ? `無法連線到後端，請確認後端伺服器已啟動 (${raw})`
+        : raw;
+    setPageError(friendly);
+  }, []);
 
   const progress = useTaskProgress(taskId);
 
@@ -89,7 +100,7 @@ export default function Home() {
         setSelectedFile(null);
         setHistoryKey((k) => k + 1);
       } catch (err) {
-        setPageError(String(err));
+        reportError(err);
       } finally {
         setBusy(false);
       }
@@ -110,7 +121,7 @@ export default function Home() {
         setCurrentFrameStep(res.frame_step ?? 1);
         if (res.tracks.length > 0) setSelectedTrack(res.tracks[0].track_id);
       } catch (e) {
-        if (!cancelled) setPageError(String(e));
+        if (!cancelled) reportError(e);
       }
     })();
     return () => {
@@ -134,7 +145,7 @@ export default function Home() {
           setHistoryKey((k) => k + 1);
         }
       } catch (e) {
-        if (!cancelled) setPageError(String(e));
+        if (!cancelled) reportError(e);
       }
     })();
     return () => {
@@ -152,7 +163,7 @@ export default function Home() {
       try {
         await postConvert(taskId, { track_id: selectedTrack, fps, smoothing, interpolate });
       } catch (e) {
-        setPageError(String(e));
+        reportError(e);
       } finally {
         setBusy(false);
       }
@@ -210,7 +221,7 @@ export default function Home() {
           if (payload.convertedTrackId != null) setConvertedTrackId(payload.convertedTrackId);
         }
       } catch (e) {
-        setPageError(String(e));
+        reportError(e);
       } finally {
         setBusy(false);
       }
@@ -258,9 +269,11 @@ export default function Home() {
   const onCopyShareLink = useCallback(() => {
     if (!shareToken) return;
     const link = `${window.location.origin}/r/${shareToken}`;
-    navigator.clipboard.writeText(link).catch(() => {});
-    alert(`link copied:\n${link}`);
-  }, [shareToken]);
+    navigator.clipboard
+      .writeText(link)
+      .then(() => setPageInfo(`已複製分享連結：${link}`))
+      .catch(() => reportError(new Error("複製失敗，請手動複製")));
+  }, [shareToken, reportError]);
 
   const canConvert =
     taskId !== null &&
@@ -385,7 +398,15 @@ export default function Home() {
       )}
 
       {pageError && (
-        <pre style={{ color: "#c33", background: "#fee", padding: 12, overflow: "auto" }}>{pageError}</pre>
+        <ErrorBanner message={pageError} variant="error" onDismiss={() => setPageError(null)} />
+      )}
+      {pageInfo && (
+        <ErrorBanner
+          message={pageInfo}
+          variant="info"
+          onDismiss={() => setPageInfo(null)}
+          autoHideMs={3000}
+        />
       )}
 
       {(bvhText || vrmaBlob) && (

@@ -108,7 +108,16 @@ export async function postConvert(
 
 export async function downloadBvhText(taskId: string): Promise<string> {
   const res = await fetch(`${API_BASE}/api/tasks/${taskId}/download/bvh`);
-  if (!res.ok) throw new Error(`download bvh failed: ${res.status}`);
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const body = await res.json();
+      detail = body?.detail ?? JSON.stringify(body);
+    } catch {
+      detail = await res.text();
+    }
+    throw new Error(`${res.status} ${res.statusText}: ${detail}`);
+  }
   return res.text();
 }
 
@@ -194,5 +203,14 @@ export async function deleteTask(taskId: string): Promise<void> {
     method: "DELETE",
     headers: clientHeaders(),
   });
-  if (!res.ok) throw new Error(`delete failed: ${res.status}`);
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const body = await res.json();
+      detail = body?.detail ?? JSON.stringify(body);
+    } catch {
+      detail = await res.text();
+    }
+    throw new Error(`${res.status} ${res.statusText}: ${detail}`);
+  }
 }
