@@ -1005,9 +1005,9 @@ interpolation.py: axis-angle → quaternion → SLERP 補幀 → axis-angle
 
 **Phase 10b：雙向 playhead 同步**
 
-- [ ] 10b.1 `ReviewPanel.tsx`：`onVideoSeek` 額外同步 `overlayRef.current.currentTime = localT`，並更新 VRM 時間（`localT - trackOffsetTime`）
-- [ ] 10b.2 `ReviewPanel.tsx`：`onOverlaySeek` 額外同步 `videoRef.current.currentTime = clipStart + overlayT`
-- [ ] 10b.3 `ReviewPanel.tsx`：啟用條件放寬為「原始影片與 overlay 都載入」，不再只限 `isSyncWithClip`
+- [x] 10b.1 `ReviewPanel.tsx`：`onVideoSeek` 額外同步 `overlayRef.current.currentTime = localT`，並更新 VRM 時間（`localT - trackOffsetTime`）
+- [x] 10b.2 `ReviewPanel.tsx`：`onOverlaySeek` 額外同步 `videoRef.current.currentTime = clipStart + overlayT`
+- [x] 10b.3 `ReviewPanel.tsx`：啟用條件放寬為「原始影片與 overlay 都載入」，不再只限 `isSyncWithClip`
 
 **驗收：** 拖原始影片 playbar → overlay + VRM 跟動；反向拖 overlay → 原始影片跟動
 

@@ -227,8 +227,17 @@ export function ReviewPanel({ videoUrl, overlayUrl, vrmaBlob, vrmUrl, trim, clip
       const absT = clipStart + localT;
       v.currentTime = absT;
       setCurrentTime(absT);
+      // 反向同步 overlay 與 VRM（若存在）
+      const ov = overlayRef.current;
+      if (ov) {
+        ov.currentTime = localT;
+        setOverlayCurrentTime(localT);
+      }
+      if (vrmaBlob) {
+        vrmRef.current?.setTime(localT - trackOffsetTime);
+      }
     },
-    [clipStart],
+    [clipStart, vrmaBlob, trackOffsetTime],
   );
 
   const onOverlaySeek = useCallback(
@@ -237,11 +246,18 @@ export function ReviewPanel({ videoUrl, overlayUrl, vrmaBlob, vrmUrl, trim, clip
       if (!ov) return;
       ov.currentTime = t;
       setOverlayCurrentTime(t);
-      if (isSyncWithClip) {
+      // 反向同步原始影片（若有 clip 範圍）
+      const v = videoRef.current;
+      if (v && clip) {
+        const absT = clipStart + t;
+        v.currentTime = absT;
+        setCurrentTime(absT);
+      }
+      if (vrmaBlob) {
         vrmRef.current?.setTime(t - trackOffsetTime);
       }
     },
-    [isSyncWithClip, trackOffsetTime],
+    [clip, clipStart, vrmaBlob, trackOffsetTime],
   );
 
   const segmentDuration = Math.max(0, endTime - startTime);
@@ -309,7 +325,7 @@ export function ReviewPanel({ videoUrl, overlayUrl, vrmaBlob, vrmUrl, trim, clip
                   onSeek={onSeek}
                 />
               )}
-              {isSyncWithClip && clipEnd > clipStart && (
+              {!isTrimming && clip && overlayUrl && clipEnd > clipStart && (
                 <PlaybackBar
                   duration={clipEnd - clipStart}
                   currentTime={Math.max(0, currentTime - clipStart)}
