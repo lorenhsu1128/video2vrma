@@ -6,6 +6,7 @@ MODELS = ROOT / "models"
 DATA = ROOT / "data"
 SMPL_ROOT = DATA / "smpl"
 TMP = ROOT / "tmp"
+LOG_DIR = TMP / "logs"
 
 PROJECT_HOME = MODELS / "_home"
 PROJECT_IOPATH = MODELS / "iopath_cache"

@@ -78,6 +78,8 @@ class GPUWorker:
             raise RuntimeError(f"task {task_id} has no video_path")
 
         task.detect_started_at = datetime.now()
+        log.info("detect start: task=%s video=%s frame_step=%d",
+                 task_id, task.video_path, task.frame_step)
         await self.task_manager.update_progress(
             task_id, TaskStep.DETECTING, 0.0, "PHALP 偵測中…"
         )
@@ -118,6 +120,9 @@ class GPUWorker:
             task.overlay_path = str(overlay)
 
         task.detect_finished_at = datetime.now()
+        elapsed = (task.detect_finished_at - task.detect_started_at).total_seconds()
+        log.info("detect done: task=%s tracks=%d elapsed=%.2fs",
+                 task_id, len(task.tracks), elapsed)
         await self.task_manager.update_progress(
             task_id,
             TaskStep.TRACKS_READY,
@@ -142,6 +147,8 @@ class GPUWorker:
 
         task.convert_started_at = datetime.now()
         task.convert_finished_at = None
+        log.info("convert start: task=%s track_id=%d fps=%d smoothing=%s interpolate=%s",
+                 task_id, track_id, fps, smoothing, interpolate)
         await self.task_manager.update_progress(
             task_id, TaskStep.CONVERTING, 0.5, "BVH 轉換中…"
         )
@@ -172,6 +179,9 @@ class GPUWorker:
         task.bvh_path = str(bvh_path)
         task.converted_track_id = track_id
         task.convert_finished_at = datetime.now()
+        elapsed = (task.convert_finished_at - task.convert_started_at).total_seconds()
+        log.info("convert done: task=%s track_id=%d elapsed=%.2fs",
+                 task_id, track_id, elapsed)
         await self.task_manager.update_progress(
             task_id, TaskStep.BVH_READY, 1.0, "BVH 完成"
         )
